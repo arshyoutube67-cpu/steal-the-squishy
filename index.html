@@ -1,503 +1,2405 @@
-using System;
-using System.IO;
-using System.Collections.Generic;
-using UnityEngine;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Steal a Squishy 3D</title>
 
-/// <summary>
-/// AvatarHub2D - single-file 2D avatar editor + two simple mini-games.
-/// Attach to a GameObject. Create child GameObjects (SpriteRenderer) for each layer.
-/// Configure layers & renderers in Inspector. Assign itemSprite and obstacleSprite for games.
-/// 
-/// Controls:
-/// - In Editor/Hub UI (left): edit avatar, save/load, export/import JSON.
-/// - In games: Move avatar with Left/Right arrows or A/D.
-/// - Back to Hub from game via UI button.
-/// 
-/// This is a compact demo — extend as needed.
-/// </summary>
-
-[Serializable]
-public class AvatarLayer
-{
-    public string layerName = "Layer";
-    public Sprite[] options = new Sprite[0];
-    public bool tintable = true;
-    public Color color = Color.white;
-
-    [NonSerialized] public int selectedIndex = 0;
+<style>
+*{
+  box-sizing:border-box;
+  -webkit-tap-highlight-color:transparent;
 }
 
-[Serializable]
-public class AvatarData
-{
-    public int[] selectedIndices;
-    public Color[] colors;
+html,body{
+  margin:0;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  background:#8ed8ff;
+  font-family:Arial,sans-serif;
+  touch-action:none;
 }
 
-public class AvatarHub2D : MonoBehaviour
-{
-    public AvatarLayer[] layers = new AvatarLayer[0];
-    public SpriteRenderer[] renderers = new SpriteRenderer[0];
-
-    [Header("Game sprites (assign simple sprites)")]
-    public Sprite itemSprite;
-    public Sprite obstacleSprite;
-
-    [Header("Game settings")]
-    public float playerSpeed = 6f;
-    public float collectibleFallSpeed = 3f;
-    public float obstacleSpeed = 2.5f;
-    public float spawnInterval = 1.0f;
-    public int startingLives = 3;
-
-    [Header("Save")]
-    public string playerPrefsKey = "avatar_json";
-    public string saveFileName = "avatar.json";
-
-    enum Mode { Hub, Editor, Game1_Collect, Game2_Dodge }
-    Mode mode = Mode.Hub;
-
-    // runtime state
-    private Vector2 scroll = Vector2.zero;
-    private float spawnTimer = 0f;
-    private int score = 0;
-    private int lives = 0;
-    private List<SpawnInstance> spawned = new List<SpawnInstance>();
-
-    // basic play area (world coordinates)
-    private Rect playArea = new Rect(-6f, -4f, 12f, 8f); // x,y,width,height
-
-    // Use the same GameObject transform as player root (script attached to it).
-    private Transform playerTransform;
-    private float collisionRadius = 0.6f;
-
-    [Serializable]
-    class SpawnInstance
-    {
-        public GameObject go;
-        public Vector2 velocity;
-        public bool isCollectible;
-    }
-
-    void Start()
-    {
-        playerTransform = this.transform;
-        if (renderers == null) renderers = new SpriteRenderer[0];
-        // initialize selected indices
-        for (int i = 0; i < layers.Length; i++)
-        {
-            var L = layers[i];
-            if (L.options == null || L.options.Length == 0)
-                L.selectedIndex = -1;
-            else
-                L.selectedIndex = Mathf.Clamp(L.selectedIndex, 0, L.options.Length - 1);
-        }
-        ApplyAll();
-    }
-
-    void Update()
-    {
-        // simple movement when in game modes
-        if (mode == Mode.Game1_Collect || mode == Mode.Game2_Dodge)
-        {
-            float h = Input.GetAxis("Horizontal");
-            Vector3 p = playerTransform.position;
-            p.x += h * playerSpeed * Time.deltaTime;
-            // clamp inside play area horizontally
-            float minX = playArea.xMin + 0.5f;
-            float maxX = playArea.xMax - 0.5f;
-            p.x = Mathf.Clamp(p.x, minX, maxX);
-            playerTransform.position = p;
-
-            // spawn logic
-            spawnTimer += Time.deltaTime;
-            if (spawnTimer >= spawnInterval)
-            {
-                spawnTimer = 0f;
-                if (mode == Mode.Game1_Collect) SpawnCollectible();
-                else SpawnObstacle();
-            }
-
-            // move spawned and check collisions
-            for (int i = spawned.Count - 1; i >= 0; i--)
-            {
-                var s = spawned[i];
-                if (s == null || s.go == null) { spawned.RemoveAt(i); continue; }
-                s.go.transform.position += (Vector3)(s.velocity * Time.deltaTime);
-
-                // remove when out of play area
-                Vector2 pos = s.go.transform.position;
-                if (pos.y < playArea.yMin - 2f || pos.y > playArea.yMax + 2f ||
-                    pos.x < playArea.xMin - 3f || pos.x > playArea.xMax + 3f)
-                {
-                    Destroy(s.go);
-                    spawned.RemoveAt(i);
-                    continue;
-                }
-
-                // collision with player (distance-based)
-                if (Vector2.Distance(s.go.transform.position, (Vector2)playerTransform.position) < collisionRadius)
-                {
-                    if (s.isCollectible)
-                    {
-                        score += 1;
-                    }
-                    else
-                    {
-                        lives -= 1;
-                    }
-                    Destroy(s.go);
-                    spawned.RemoveAt(i);
-                }
-            }
-
-            // check lose condition (for Game2)
-            if (mode == Mode.Game2_Dodge && lives <= 0)
-            {
-                // back to hub on loss
-                mode = Mode.Hub;
-                CleanupSpawned();
-            }
-        }
-    }
-
-    void SpawnCollectible()
-    {
-        if (itemSprite == null) return;
-        float x = UnityEngine.Random.Range(playArea.xMin + 0.5f, playArea.xMax - 0.5f);
-        Vector2 pos = new Vector2(x, playArea.yMax + 1.0f);
-        GameObject go = new GameObject("Collectible");
-        go.transform.position = pos;
-        var sr = go.AddComponent<SpriteRenderer>();
-        sr.sprite = itemSprite;
-        sr.sortingOrder = 100;
-        var s = new SpawnInstance();
-        s.go = go;
-        s.velocity = new Vector2(0f, -collectibleFallSpeed);
-        s.isCollectible = true;
-        spawned.Add(s);
-    }
-
-    void SpawnObstacle()
-    {
-        if (obstacleSprite == null) return;
-        // Spawn from top moving down-left or down-right
-        float x = UnityEngine.Random.Range(playArea.xMin + 0.5f, playArea.xMax - 0.5f);
-        Vector2 pos = new Vector2(x, playArea.yMax + 1.0f);
-        GameObject go = new GameObject("Obstacle");
-        go.transform.position = pos;
-        var sr = go.AddComponent<SpriteRenderer>();
-        sr.sprite = obstacleSprite;
-        sr.sortingOrder = 100;
-        var s = new SpawnInstance();
-        s.go = go;
-        // obstacles can have slight horizontal velocity
-        float vx = UnityEngine.Random.Range(-1f, 1f) * 0.6f;
-        s.velocity = new Vector2(vx, -obstacleSpeed);
-        s.isCollectible = false;
-        spawned.Add(s);
-    }
-
-    void CleanupSpawned()
-    {
-        for (int i = 0; i < spawned.Count; i++)
-            if (spawned[i] != null && spawned[i].go != null) Destroy(spawned[i].go);
-        spawned.Clear();
-    }
-
-    void OnGUI()
-    {
-        // Left panel UI
-        GUILayout.BeginArea(new Rect(10, 10, 360, Screen.height - 20), GUI.skin.box);
-        scroll = GUILayout.BeginScrollView(scroll);
-
-        GUILayout.Label("<b>Avatar Hub & Mini-Games</b>");
-        GUILayout.Space(6);
-
-        GUILayout.BeginHorizontal();
-        if (GUILayout.Button("Hub", GUILayout.Width(110))) { mode = Mode.Hub; CleanupSpawned(); }
-        if (GUILayout.Button("Editor", GUILayout.Width(110))) { mode = Mode.Editor; CleanupSpawned(); }
-        GUILayout.EndHorizontal();
-
-        GUILayout.Space(6);
-
-        if (mode == Mode.Hub)
-        {
-            GUILayout.Label("Games:");
-            if (GUILayout.Button("Play Game 1 — Collect (falling items)")) { StartGame1(); }
-            if (GUILayout.Button("Play Game 2 — Dodge (avoid obstacles)")) { StartGame2(); }
-            GUILayout.Space(6);
-            GUILayout.Label("Avatar quick:");
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Randomize")) { RandomizeAvatar(); ApplyAll(); }
-            if (GUILayout.Button("Reset")) { ResetAvatar(); ApplyAll(); }
-            GUILayout.EndHorizontal();
-
-            GUILayout.Space(6);
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Save (PlayerPrefs)")) { SaveToPlayerPrefs(); }
-            if (GUILayout.Button("Load (PlayerPrefs)")) { LoadFromPlayerPrefs(); ApplyAll(); }
-            GUILayout.EndHorizontal();
-
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Save to file")) { SaveToFile(); }
-            if (GUILayout.Button("Load from file")) { LoadFromFile(); ApplyAll(); }
-            GUILayout.EndHorizontal();
-
-            GUILayout.Space(6);
-            if (GUILayout.Button("Export JSON to clipboard")) { GUIUtility.systemCopyBuffer = ExportToJson(); }
-            if (GUILayout.Button("Import JSON from clipboard")) { ImportFromJson(GUIUtility.systemCopyBuffer); ApplyAll(); }
-
-            GUILayout.Space(8);
-            GUILayout.Label("Play area (world coords): " + playArea.ToString());
-        }
-        else if (mode == Mode.Editor)
-        {
-            GUILayout.Label("<b>Avatar Editor</b>");
-            if (layers == null || layers.Length == 0)
-            {
-                GUILayout.Label("No layers defined. Configure in Inspector.");
-            }
-            else
-            {
-                for (int i = 0; i < layers.Length; i++)
-                {
-                    DrawLayerEditor(i);
-                    GUILayout.Space(6);
-                }
-            }
-        }
-        else // game modes
-        {
-            GUILayout.Label("<b>In Game</b>");
-            GUILayout.Label("Mode: " + (mode == Mode.Game1_Collect ? "Collect" : "Dodge"));
-            GUILayout.Label("Score: " + score);
-            if (mode == Mode.Game2_Dodge) GUILayout.Label("Lives: " + lives);
-            if (GUILayout.Button("Back to Hub")) { mode = Mode.Hub; CleanupSpawned(); }
-            GUILayout.Space(6);
-            GUILayout.Label("Use A/D or Left/Right to move.");
-        }
-
-        GUILayout.EndScrollView();
-        GUILayout.EndArea();
-
-        // Game HUD drawn near top center
-        if (mode == Mode.Game1_Collect || mode == Mode.Game2_Dodge)
-        {
-            GUILayout.BeginArea(new Rect(Screen.width / 2 - 120, 6, 240, 90), GUI.skin.box);
-            GUILayout.Label((mode == Mode.Game1_Collect ? "Game 1 — Collect" : "Game 2 — Dodge"), GUI.skin.label);
-            GUILayout.Label("Score: " + score);
-            if (mode == Mode.Game2_Dodge) GUILayout.Label("Lives: " + lives);
-            GUILayout.EndArea();
-        }
-    }
-
-    void DrawLayerEditor(int i)
-    {
-        var layer = layers[i];
-        GUILayout.BeginVertical(GUI.skin.box);
-        GUILayout.Label(string.Format("<b>{0}</b>", layer.layerName));
-        GUILayout.BeginHorizontal();
-        if (GUILayout.Button("Prev", GUILayout.Width(70))) { ChangeIndex(i, -1); ApplyAll(); }
-        GUILayout.Label((layer.options != null && layer.options.Length > 0 && layer.selectedIndex >= 0) ?
-            string.Format("{0} / {1}", Mathf.Max(0, layer.selectedIndex + 1), layer.options.Length) : "No options", GUILayout.Width(120));
-        if (GUILayout.Button("Next", GUILayout.Width(70))) { ChangeIndex(i, +1); ApplyAll(); }
-        GUILayout.EndHorizontal();
-
-        if (layer.tintable)
-        {
-            GUILayout.Space(4);
-            GUILayout.Label("Tint (RGB)");
-            layer.color.r = GUILayout.HorizontalSlider(layer.color.r, 0f, 1f);
-            layer.color.g = GUILayout.HorizontalSlider(layer.color.g, 0f, 1f);
-            layer.color.b = GUILayout.HorizontalSlider(layer.color.b, 0f, 1f);
-            GUILayout.BeginHorizontal();
-            GUILayout.Label("R:" + Mathf.RoundToInt(layer.color.r * 255), GUILayout.Width(60));
-            GUILayout.Label("G:" + Mathf.RoundToInt(layer.color.g * 255), GUILayout.Width(60));
-            GUILayout.Label("B:" + Mathf.RoundToInt(layer.color.b * 255), GUILayout.Width(60));
-            GUILayout.EndHorizontal();
-        }
-        else
-        {
-            GUILayout.Label("Tint disabled for this layer.");
-        }
-
-        GUILayout.EndVertical();
-    }
-
-    void ChangeIndex(int layerIndex, int delta)
-    {
-        var layer = layers[layerIndex];
-        if (layer.options == null || layer.options.Length == 0) { layer.selectedIndex = -1; return; }
-        int len = layer.options.Length;
-        int idx = layer.selectedIndex;
-        if (idx < 0) idx = 0;
-        idx = (idx + delta) % len;
-        if (idx < 0) idx += len;
-        layer.selectedIndex = idx;
-    }
-
-    void ApplyAll()
-    {
-        int n = Mathf.Min(layers.Length, renderers.Length);
-        for (int i = 0; i < n; i++)
-        {
-            var layer = layers[i];
-            var rend = renderers[i];
-            if (rend == null) continue;
-            if (layer.options != null && layer.options.Length > 0 && layer.selectedIndex >= 0)
-                rend.sprite = layer.options[layer.selectedIndex];
-            else
-                rend.sprite = null;
-
-            if (layer.tintable)
-                rend.color = layer.color;
-            else
-                rend.color = Color.white;
-        }
-    }
-
-    void RandomizeAvatar()
-    {
-        System.Random r = new System.Random();
-        for (int i = 0; i < layers.Length; i++)
-        {
-            var layer = layers[i];
-            if (layer.options != null && layer.options.Length > 0)
-                layer.selectedIndex = r.Next(0, layer.options.Length);
-            if (layer.tintable)
-                layer.color = new Color((float)r.NextDouble(), (float)r.NextDouble(), (float)r.NextDouble(), 1f);
-        }
-    }
-
-    void ResetAvatar()
-    {
-        for (int i = 0; i < layers.Length; i++)
-        {
-            var layer = layers[i];
-            if (layer.options != null && layer.options.Length > 0)
-                layer.selectedIndex = 0;
-            if (layer.tintable)
-                layer.color = Color.white;
-        }
-    }
-
-    string ExportToJson()
-    {
-        AvatarData data = new AvatarData();
-        data.selectedIndices = new int[layers.Length];
-        data.colors = new Color[layers.Length];
-        for (int i = 0; i < layers.Length; i++)
-        {
-            data.selectedIndices[i] = (layers[i].selectedIndex >= 0) ? layers[i].selectedIndex : -1;
-            data.colors[i] = layers[i].color;
-        }
-        string json = JsonUtility.ToJson(data, true);
-        return json;
-    }
-
-    void ImportFromJson(string json)
-    {
-        if (string.IsNullOrEmpty(json)) { Debug.LogWarning("Import JSON is empty."); return; }
-        try
-        {
-            AvatarData data = JsonUtility.FromJson<AvatarData>(json);
-            if (data != null && data.selectedIndices != null)
-            {
-                int m = Mathf.Min(data.selectedIndices.Length, layers.Length);
-                for (int i = 0; i < m; i++)
-                {
-                    layers[i].selectedIndex = data.selectedIndices[i];
-                }
-            }
-            if (data != null && data.colors != null)
-            {
-                int m = Mathf.Min(data.colors.Length, layers.Length);
-                for (int i = 0; i < m; i++)
-                {
-                    layers[i].color = data.colors[i];
-                }
-            }
-            ApplyAll();
-        }
-        catch (Exception e) { Debug.LogWarning("Failed to import avatar JSON: " + e.Message); }
-    }
-
-    void SaveToPlayerPrefs()
-    {
-        string json = ExportToJson();
-        PlayerPrefs.SetString(playerPrefsKey, json);
-        PlayerPrefs.Save();
-        Debug.Log("Avatar saved to PlayerPrefs.");
-    }
-
-    void LoadFromPlayerPrefs()
-    {
-        if (!PlayerPrefs.HasKey(playerPrefsKey)) { Debug.LogWarning("No avatar in PlayerPrefs."); return; }
-        string json = PlayerPrefs.GetString(playerPrefsKey);
-        ImportFromJson(json);
-        ApplyAll();
-        Debug.Log("Avatar loaded from PlayerPrefs.");
-    }
-
-    void SaveToFile()
-    {
-        try
-        {
-            string path = Path.Combine(Application.persistentDataPath, saveFileName);
-            File.WriteAllText(path, ExportToJson());
-            Debug.Log("Saved avatar to " + path);
-        }
-        catch (Exception e) { Debug.LogWarning("SaveToFile failed: " + e.Message); }
-    }
-
-    void LoadFromFile()
-    {
-        try
-        {
-            string path = Path.Combine(Application.persistentDataPath, saveFileName);
-            if (!File.Exists(path)) { Debug.LogWarning("Save file not found: " + path); return; }
-            string json = File.ReadAllText(path);
-            ImportFromJson(json);
-            ApplyAll();
-            Debug.Log("Loaded avatar from " + path);
-        }
-        catch (Exception e) { Debug.LogWarning("LoadFromFile failed: " + e.Message); }
-    }
-
-    void StartGame1()
-    {
-        mode = Mode.Game1_Collect;
-        score = 0;
-        spawnTimer = 0f;
-        CleanupSpawned();
-        // position player
-        Vector3 p = playerTransform.position;
-        p.x = 0f; p.y = playArea.yMin + 1.0f;
-        playerTransform.position = p;
-    }
-
-    void StartGame2()
-    {
-        mode = Mode.Game2_Dodge;
-        score = 0;
-        lives = startingLives;
-        spawnTimer = 0f;
-        CleanupSpawned();
-        Vector3 p = playerTransform.position;
-        p.x = 0f; p.y = playArea.yMin + 1.0f;
-        playerTransform.position = p;
-    }
-
-    // Optional: on draw gizmos show play area and player
-    void OnDrawGizmosSelected()
-    {
-        Gizmos.color = Color.cyan;
-        Gizmos.DrawWireCube(new Vector3(playArea.center.x, playArea.center.y, 0f), new Vector3(playArea.width, playArea.height, 0f));
-        if (Application.isPlaying && playerTransform != null)
-        {
-            Gizmos.color = Color.yellow;
-            Gizmos.DrawWireSphere(playerTransform.position, collisionRadius);
-        }
-    }
+canvas{
+  display:block;
 }
+
+button{
+  font-family:Arial,sans-serif;
+  cursor:pointer;
+}
+
+#hud{
+  position:fixed;
+  inset:0;
+  z-index:10;
+  pointer-events:none;
+}
+
+.topbar{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:12px;
+}
+
+.pill,
+.action{
+  background:rgba(15,20,35,.88);
+  color:white;
+  border:2px solid rgba(255,255,255,.25);
+  border-radius:14px;
+  padding:9px 13px;
+  font-weight:800;
+  box-shadow:0 4px 15px #0005;
+}
+
+.action{
+  pointer-events:auto;
+  border:none;
+}
+
+#message{
+  position:absolute;
+  top:70px;
+  left:50%;
+  transform:translateX(-50%);
+  background:rgba(15,20,35,.92);
+  color:white;
+  padding:10px 16px;
+  border-radius:12px;
+  opacity:0;
+  transition:.2s;
+  font-weight:700;
+  white-space:nowrap;
+}
+
+#message.show{
+  opacity:1;
+}
+
+.panel{
+  position:fixed;
+  z-index:30;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  width:min(92vw,520px);
+  max-height:82vh;
+  overflow:auto;
+  background:rgba(20,24,40,.97);
+  color:white;
+  border:2px solid #ffffff33;
+  border-radius:20px;
+  padding:18px;
+  box-shadow:0 20px 70px #0008;
+}
+
+.hidden{
+  display:none;
+}
+
+.panel h2{
+  margin:0 0 12px;
+}
+
+.shopItem,
+.collectionItem{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:12px;
+  margin:8px 0;
+  background:#ffffff12;
+  border-radius:14px;
+}
+
+.shopItem button{
+  padding:9px 12px;
+  border:0;
+  border-radius:10px;
+  font-weight:800;
+}
+
+.close{
+  width:100%;
+  padding:12px;
+  border:0;
+  border-radius:12px;
+  font-weight:800;
+  margin-top:10px;
+}
+
+#controls{
+  position:fixed;
+  z-index:15;
+  inset:0;
+  pointer-events:none;
+}
+
+#joystick{
+  position:absolute;
+  left:20px;
+  bottom:24px;
+  width:130px;
+  height:130px;
+  border-radius:50%;
+  background:#ffffff25;
+  border:2px solid #ffffff55;
+  pointer-events:auto;
+}
+
+#stick{
+  position:absolute;
+  width:58px;
+  height:58px;
+  left:34px;
+  top:34px;
+  border-radius:50%;
+  background:#ffffff66;
+  border:2px solid #fff;
+}
+
+#rightButtons{
+  position:absolute;
+  right:18px;
+  bottom:20px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+#rightButtons button{
+  width:66px;
+  height:66px;
+  border:0;
+  border-radius:50%;
+  background:#ffffffd5;
+  font-size:25px;
+  pointer-events:auto;
+  box-shadow:0 5px 18px #0004;
+}
+
+#crosshair{
+  position:fixed;
+  z-index:11;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  color:white;
+  font-size:24px;
+  text-shadow:0 2px 5px black;
+  pointer-events:none;
+}
+
+#help{
+  position:fixed;
+  z-index:11;
+  left:50%;
+  bottom:10px;
+  transform:translateX(-50%);
+  color:white;
+  background:#0008;
+  padding:7px 11px;
+  border-radius:9px;
+  font-size:12px;
+  pointer-events:none;
+}
+
+#interactHint{
+  position:fixed;
+  z-index:12;
+  left:50%;
+  top:57%;
+  transform:translateX(-50%);
+  background:#111d;
+  color:white;
+  padding:9px 15px;
+  border-radius:12px;
+  font-weight:bold;
+  display:none;
+  pointer-events:none;
+}
+
+@media(min-width:800px){
+  #joystick,
+  #rightButtons{
+    display:none;
+  }
+}
+
+@media(max-width:799px){
+  #help{
+    display:none;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div id="hud">
+  <div class="topbar">
+    <div class="pill">💰 <span id="coins">0</span></div>
+    <div class="pill">🏠 Lv.<span id="baseLevel">1</span></div>
+    <button id="lockBtn" class="action">
+      🔒 LOCK <span id="lockTimer"></span>
+    </button>
+  </div>
+
+  <div id="message"></div>
+</div>
+
+<div id="interactHint"></div>
+
+<div id="shop" class="panel hidden">
+  <h2>🛒 Squishy Shop</h2>
+  <div id="shopList"></div>
+  <button class="close" id="closeShop">Close</button>
+</div>
+
+<div id="collectionPanel" class="panel hidden">
+  <h2>🧸 My Squishies</h2>
+  <div id="collection"></div>
+  <button class="close" id="closeCollection">Close</button>
+</div>
+
+<div id="controls">
+  <div id="joystick">
+    <div id="stick"></div>
+  </div>
+
+  <div id="rightButtons">
+    <button id="jump">⬆️</button>
+    <button id="interact">✋</button>
+    <button id="collectionButton">🧸</button>
+  </div>
+</div>
+
+<div id="crosshair">+</div>
+
+<div id="help">
+  WASD = Move • Mouse = Look • E = Interact • Space = Jump
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+
+<script>
+/* =========================================================
+   STEAL A SQUISHY 3D
+   ONE-FILE VERSION
+========================================================= */
+
+
+/* =========================
+   THREE.JS SETUP
+========================= */
+
+const scene = new THREE.Scene();
+
+scene.background = new THREE.Color(0x8ed8ff);
+
+scene.fog = new THREE.Fog(
+  0x8ed8ff,
+  35,
+  120
+);
+
+const camera = new THREE.PerspectiveCamera(
+  70,
+  innerWidth / innerHeight,
+  0.1,
+  250
+);
+
+camera.position.set(0,5,14);
+
+const renderer = new THREE.WebGLRenderer({
+  antialias:true
+});
+
+renderer.setPixelRatio(
+  Math.min(devicePixelRatio,2)
+);
+
+renderer.setSize(
+  innerWidth,
+  innerHeight
+);
+
+renderer.shadowMap.enabled = true;
+
+document.body.appendChild(
+  renderer.domElement
+);
+
+
+/* =========================
+   LIGHTING
+========================= */
+
+const hemi =
+  new THREE.HemisphereLight(
+    0xffffff,
+    0x557799,
+    2
+  );
+
+scene.add(hemi);
+
+const sun =
+  new THREE.DirectionalLight(
+    0xffffff,
+    2.5
+  );
+
+sun.position.set(
+  20,
+  35,
+  10
+);
+
+sun.castShadow=true;
+
+sun.shadow.mapSize.set(
+  2048,
+  2048
+);
+
+scene.add(sun);
+
+
+/* =========================
+   UI
+========================= */
+
+const coinsEl =
+  document.getElementById("coins");
+
+const baseEl =
+  document.getElementById("baseLevel");
+
+const messageEl =
+  document.getElementById("message");
+
+const lockBtn =
+  document.getElementById("lockBtn");
+
+const lockTimer =
+  document.getElementById("lockTimer");
+
+const interactHint =
+  document.getElementById("interactHint");
+
+const shop =
+  document.getElementById("shop");
+
+const collectionPanel =
+  document.getElementById("collectionPanel");
+
+const shopList =
+  document.getElementById("shopList");
+
+const collection =
+  document.getElementById("collection");
+
+
+function message(text){
+
+  messageEl.textContent=text;
+
+  messageEl.classList.add("show");
+
+  clearTimeout(message.timer);
+
+  message.timer=setTimeout(()=>{
+    messageEl.classList.remove("show");
+  },1800);
+}
+
+
+/* =========================
+   GAME DATA
+========================= */
+
+const TYPES={
+
+  butter:{
+    name:"Butter Squishy",
+    price:60,
+    income:2,
+    rarity:"Common",
+    color:0xffd84a,
+    shape:"butter"
+  },
+
+  needoh:{
+    name:"NeeDoh Squishy",
+    price:120,
+    income:5,
+    rarity:"Rare",
+    color:0x69c9ff,
+    shape:"ball"
+  },
+
+  burger:{
+    name:"Burger Squishy",
+    price:300,
+    income:12,
+    rarity:"Epic",
+    color:0xd58a45,
+    shape:"burger"
+  },
+
+  sprite:{
+    name:"Sprite Squishy",
+    price:500,
+    income:20,
+    rarity:"Legendary",
+    color:0x8adf8b,
+    shape:"can"
+  },
+
+  cola:{
+    name:"Coca-Cola Squishy",
+    price:750,
+    income:30,
+    rarity:"Legendary",
+    color:0xc52f2f,
+    shape:"cola"
+  },
+
+  pepsi:{
+    name:"Pepsi Squishy",
+    price:1000,
+    income:45,
+    rarity:"Mythic",
+    color:0x3575dc,
+    shape:"pepsi"
+  }
+
+};
+
+
+/* =========================
+   SAVE SYSTEM
+========================= */
+
+let save;
+
+try{
+
+  save =
+    JSON.parse(
+      localStorage.getItem(
+        "stealASquishySave"
+      )
+    );
+
+}catch(e){
+
+  save=null;
+
+}
+
+if(!save){
+
+  save={
+    coins:500,
+    baseLevel:1,
+    collection:[],
+    placed:[],
+    lockUntil:0
+  };
+
+}
+
+if(!Array.isArray(save.collection))
+  save.collection=[];
+
+if(!Array.isArray(save.placed))
+  save.placed=[];
+
+
+function saveGame(){
+
+  localStorage.setItem(
+    "stealASquishySave",
+    JSON.stringify(save)
+  );
+
+}
+
+
+function updateUI(){
+
+  coinsEl.textContent =
+    Math.floor(save.coins);
+
+  baseEl.textContent =
+    save.baseLevel;
+
+}
+
+
+/* =========================
+   WORLD HELPERS
+========================= */
+
+function material(color){
+
+  return new THREE.MeshStandardMaterial({
+    color:color,
+    roughness:.65,
+    metalness:.02
+  });
+
+}
+
+
+function makeBox(
+  width,
+  height,
+  depth,
+  color,
+  x,
+  y,
+  z
+){
+
+  const mesh =
+    new THREE.Mesh(
+      new THREE.BoxGeometry(
+        width,
+        height,
+        depth
+      ),
+      material(color)
+    );
+
+  mesh.position.set(
+    x,y,z
+  );
+
+  mesh.castShadow=true;
+  mesh.receiveShadow=true;
+
+  scene.add(mesh);
+
+  return mesh;
+
+}
+
+
+function makeCylinder(
+  radius,
+  height,
+  color,
+  x,
+  y,
+  z
+){
+
+  const mesh =
+    new THREE.Mesh(
+      new THREE.CylinderGeometry(
+        radius,
+        radius,
+        height,
+        32
+      ),
+      material(color)
+    );
+
+  mesh.position.set(
+    x,y,z
+  );
+
+  mesh.castShadow=true;
+  mesh.receiveShadow=true;
+
+  scene.add(mesh);
+
+  return mesh;
+
+}
+
+
+/* =========================
+   GROUND
+========================= */
+
+const ground =
+  new THREE.Mesh(
+    new THREE.PlaneGeometry(
+      180,
+      180
+    ),
+    material(0x5bb85b)
+  );
+
+ground.rotation.x=-Math.PI/2;
+
+ground.receiveShadow=true;
+
+scene.add(ground);
+
+
+/* =========================
+   ROAD
+========================= */
+
+makeBox(
+  180,
+  .05,
+  11,
+  0x3f4650,
+  0,
+  0,
+  -8
+);
+
+for(
+  let x=-80;
+  x<80;
+  x+=8
+){
+
+  makeBox(
+    4,
+    .06,
+    .25,
+    0xf2d35e,
+    x,
+    .05,
+    -8
+  );
+
+}
+
+
+/* =========================
+   BUILDINGS
+========================= */
+
+for(
+  let i=0;
+  i<38;
+  i++
+){
+
+  const side =
+    Math.random()>0.5
+    ? 1
+    : -1;
+
+  const x =
+    side *
+    (40 + Math.random()*35);
+
+  const z =
+    -50 + Math.random()*100;
+
+  const height =
+    4 + Math.random()*12;
+
+  makeBox(
+    4+Math.random()*5,
+    height,
+    4+Math.random()*5,
+    0x8998a8,
+    x,
+    height/2,
+    z
+  );
+
+}
+
+
+/* =========================
+   TEXT SPRITES
+========================= */
+
+function textSprite(text){
+
+  const canvas =
+    document.createElement("canvas");
+
+  canvas.width=512;
+  canvas.height=128;
+
+  const ctx =
+    canvas.getContext("2d");
+
+  ctx.fillStyle="white";
+
+  ctx.font=
+    "bold 55px Arial";
+
+  ctx.textAlign="center";
+
+  ctx.fillText(
+    text,
+    256,
+    75
+  );
+
+  const texture =
+    new THREE.CanvasTexture(canvas);
+
+  const sprite =
+    new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map:texture,
+        transparent:true
+      })
+    );
+
+  sprite.scale.set(
+    7,
+    1.75,
+    1
+  );
+
+  return sprite;
+
+}
+
+
+/* =========================
+   BASES
+========================= */
+
+const bases=[];
+
+
+function createBase(
+  x,
+  z,
+  color,
+  name
+){
+
+  const floor =
+    new THREE.Mesh(
+      new THREE.BoxGeometry(
+        16,
+        .6,
+        13
+      ),
+      material(color)
+    );
+
+  floor.position.set(
+    x,
+    .3,
+    z
+  );
+
+  floor.receiveShadow=true;
+
+  scene.add(floor);
+
+
+  const sign =
+    textSprite(name);
+
+  sign.position.set(
+    x,
+    2.7,
+    z-6.5
+  );
+
+  scene.add(sign);
+
+
+  bases.push({
+    x:x,
+    z:z,
+    locked:false
+  });
+
+}
+
+
+createBase(
+  -25,
+  8,
+  0x4c7dff,
+  "YOUR BASE"
+);
+
+createBase(
+  25,
+  8,
+  0xff6666,
+  "NPC BASE"
+);
+
+createBase(
+  -25,
+  -28,
+  0xa96cff,
+  "NPC BASE"
+);
+
+createBase(
+  25,
+  -28,
+  0xff9f43,
+  "NPC BASE"
+);
+
+
+/* =========================
+   SQUISHY FACE
+========================= */
+
+function makeEye(
+  x,
+  y,
+  z,
+  size=.16
+){
+
+  const eye =
+    new THREE.Mesh(
+      new THREE.SphereGeometry(
+        size,
+        16,
+        16
+      ),
+      material(0x111111)
+    );
+
+  eye.position.set(
+    x,y,z
+  );
+
+  return eye;
+
+}
+
+
+/* =========================
+   CREATE 3D SQUISHY
+========================= */
+
+function createSquishy(type){
+
+  const data=TYPES[type];
+
+  const group=
+    new THREE.Group();
+
+  group.userData.type=type;
+
+  let faceZ=-1.05;
+
+
+  /* BUTTER */
+
+  if(data.shape==="butter"){
+
+    const body =
+      new THREE.Mesh(
+        new THREE.BoxGeometry(
+          2.2,
+          1,
+          1.4
+        ),
+        material(data.color)
+      );
+
+    body.position.y=.65;
+
+    group.add(body);
+
+
+    const top =
+      new THREE.Mesh(
+        new THREE.BoxGeometry(
+          1.7,
+          .1,
+          1.1
+        ),
+        material(0xffef9b)
+      );
+
+    top.position.y=1.18;
+
+    group.add(top);
+
+  }
+
+
+  /* BURGER */
+
+  else if(data.shape==="burger"){
+
+    const bunTop =
+      new THREE.Mesh(
+        new THREE.SphereGeometry(
+          1.25,
+          24,
+          16,
+          0,
+          Math.PI*2,
+          0,
+          Math.PI/2
+        ),
+        material(0xe9a04c)
+      );
+
+    bunTop.scale.set(
+      1.25,
+      .65,
+      1
+    );
+
+    bunTop.position.y=.95;
+
+    group.add(bunTop);
+
+
+    const patty =
+      new THREE.Mesh(
+        new THREE.BoxGeometry(
+          2.35,
+          .42,
+          1.7
+        ),
+        material(0x673218)
+      );
+
+    patty.position.y=.57;
+
+    group.add(patty);
+
+
+    const cheese =
+      new THREE.Mesh(
+        new THREE.BoxGeometry(
+          2.5,
+          .16,
+          1.8
+        ),
+        material(0xffd13b)
+      );
+
+    cheese.position.y=.79;
+
+    group.add(cheese);
+
+
+    const bottom =
+      new THREE.Mesh(
+        new THREE.CylinderGeometry(
+          1.15,
+          1.15,
+          .45,
+          32
+        ),
+        material(0xd9813a)
+      );
+
+    bottom.position.y=.32;
+
+    group.add(bottom);
+
+    faceZ=-1.02;
+
+  }
+
+
+  /* DRINK CANS */
+
+  else if(data.shape==="can"){
+
+    const can =
+      new THREE.Mesh(
+        new THREE.CylinderGeometry(
+          .75,
+          .75,
+          2.1,
+          32
+        ),
+        material(data.color)
+      );
+
+    can.position.y=1.05;
+
+    group.add(can);
+
+
+    const top =
+      new THREE.Mesh(
+        new THREE.CylinderGeometry(
+          .68,
+          .68,
+          .08,
+          32
+        ),
+        material(0xc9cdd0)
+      );
+
+    top.position.y=2.12;
+
+    group.add(top);
+
+
+    const stripe =
+      new THREE.Mesh(
+        new THREE.CylinderGeometry(
+          .76,
+          .76,
+          .15,
+          32
+        ),
+        material(0xffffff)
+      );
+
+    stripe.position.y=1.15;
+
+    group.add(stripe);
+
+    faceZ=-.77;
+
+  }
+
+
+  /* NEEDOH */
+
+  else{
+
+    const body =
+      new THREE.Mesh(
+        new THREE.SphereGeometry(
+          1.15,
+          32,
+          24
+        ),
+        material(data.color)
+      );
+
+    body.scale.set(
+      1,
+      1.03,
+      .95
+    );
+
+    body.position.y=1.05;
+
+    group.add(body);
+
+    faceZ=-1.02;
+
+  }
+
+
+  /* FACE */
+
+  const eye1=
+    makeEye(
+      -.34,
+      1.3,
+      faceZ
+    );
+
+  const eye2=
+    makeEye(
+      .34,
+      1.3,
+      faceZ
+    );
+
+  group.add(
+    eye1,
+    eye2
+  );
+
+
+  const mouth =
+    new THREE.Mesh(
+      new THREE.TorusGeometry(
+        .18,
+        .045,
+        8,
+        20,
+        Math.PI
+      ),
+      material(0x222222)
+    );
+
+  mouth.rotation.x=Math.PI;
+
+  mouth.position.set(
+    0,
+    .88,
+    faceZ-.03
+  );
+
+  group.add(mouth);
+
+
+  group.traverse(
+    object=>{
+
+      if(object.isMesh){
+
+        object.castShadow=true;
+        object.receiveShadow=true;
+
+      }
+
+    }
+  );
+
+
+  return group;
+
+}
+
+
+/* =========================
+   WORLD SQUISHIES
+========================= */
+
+const worldSquishies=[];
+
+
+function addWorldSquishy(
+  type,
+  x,
+  z,
+  owner="wild"
+){
+
+  const group=
+    createSquishy(type);
+
+  group.position.set(
+    x,
+    0,
+    z
+  );
+
+  scene.add(group);
+
+
+  const squishy={
+    group:group,
+    type:type,
+    owner:owner,
+    stolen:false,
+    homeX:x,
+    homeZ:z
+  };
+
+
+  worldSquishies.push(
+    squishy
+  );
+
+  return squishy;
+
+}
+
+
+/* ROAD SQUISHIES */
+
+addWorldSquishy(
+  "butter",
+  -10,
+  -8
+);
+
+addWorldSquishy(
+  "needoh",
+  -5,
+  -8
+);
+
+addWorldSquishy(
+  "burger",
+  1,
+  -8
+);
+
+addWorldSquishy(
+  "sprite",
+  7,
+  -8
+);
+
+addWorldSquishy(
+  "cola",
+  13,
+  -8
+);
+
+addWorldSquishy(
+  "pepsi",
+  19,
+  -8
+);
+
+
+/* NPC BASE SQUISHIES */
+
+[
+  ["butter",21,8],
+  ["needoh",25,8],
+  ["burger",29,8],
+  ["sprite",21,12],
+  ["cola",25,12],
+  ["pepsi",29,12],
+
+  ["butter",-21,-28],
+  ["needoh",-25,-28],
+  ["burger",-29,-28],
+
+  ["sprite",21,-28],
+  ["cola",25,-28],
+  ["pepsi",29,-28]
+
+].forEach(item=>{
+
+  const s=
+    addWorldSquishy(
+      item[0],
+      item[1],
+      item[2],
+      "npc"
+    );
+
+  s.group.scale.setScalar(.72);
+
+});
+
+
+/* =========================
+   PLAYER
+========================= */
+
+const player=
+  new THREE.Group();
+
+scene.add(player);
+
+
+const playerBody =
+  new THREE.Mesh(
+    new THREE.CapsuleGeometry(
+      .45,
+      1.1,
+      6,
+      12
+    ),
+    material(0x286cff)
+  );
+
+playerBody.position.y=1.15;
+
+playerBody.castShadow=true;
+
+player.add(playerBody);
+
+
+const playerHead =
+  new THREE.Mesh(
+    new THREE.SphereGeometry(
+      .48,
+      20,
+      16
+    ),
+    material(0xffc28b)
+  );
+
+playerHead.position.y=2.05;
+
+playerHead.castShadow=true;
+
+player.add(playerHead);
+
+
+player.position.set(
+  -25,
+  0,
+  14
+);
+
+
+/* =========================
+   PLAYER CONTROL
+========================= */
+
+let yaw=0;
+
+let pitch=-.15;
+
+let verticalVelocity=0;
+
+let onGround=true;
+
+const keys={};
+
+
+addEventListener(
+  "keydown",
+  event=>{
+
+    keys[event.code]=true;
+
+    if(event.code==="KeyE")
+      interact();
+
+    if(event.code==="Space")
+      jump();
+
+  }
+);
+
+
+addEventListener(
+  "keyup",
+  event=>{
+    keys[event.code]=false;
+  }
+);
+
+
+/* =========================
+   MOUSE LOOK
+========================= */
+
+renderer.domElement.addEventListener(
+  "click",
+  ()=>{
+
+    if(innerWidth>=800){
+
+      renderer.domElement.requestPointerLock();
+
+    }
+
+  }
+);
+
+
+addEventListener(
+  "mousemove",
+  event=>{
+
+    if(
+      document.pointerLockElement===
+      renderer.domElement
+    ){
+
+      yaw-=event.movementX*.0025;
+
+      pitch-=event.movementY*.0025;
+
+      pitch=Math.max(
+        -1.1,
+        Math.min(.6,pitch)
+      );
+
+    }
+
+  }
+);
+
+
+/* =========================
+   MOBILE JOYSTICK
+========================= */
+
+const joystick=
+  document.getElementById(
+    "joystick"
+  );
+
+const stick=
+  document.getElementById(
+    "stick"
+  );
+
+let joystickX=0;
+
+let joystickY=0;
+
+let joystickDragging=false;
+
+
+joystick.addEventListener(
+  "pointerdown",
+  event=>{
+
+    joystickDragging=true;
+
+    joystick.setPointerCapture(
+      event.pointerId
+    );
+
+    moveJoystick(event);
+
+  }
+);
+
+
+joystick.addEventListener(
+  "pointermove",
+  event=>{
+
+    if(joystickDragging)
+      moveJoystick(event);
+
+  }
+);
+
+
+joystick.addEventListener(
+  "pointerup",
+  resetJoystick
+);
+
+
+joystick.addEventListener(
+  "pointercancel",
+  resetJoystick
+);
+
+
+function moveJoystick(event){
+
+  const rect=
+    joystick.getBoundingClientRect();
+
+  const centerX=
+    rect.left+
+    rect.width/2;
+
+  const centerY=
+    rect.top+
+    rect.height/2;
+
+  let x=
+    event.clientX-centerX;
+
+  let y=
+    event.clientY-centerY;
+
+  const max=42;
+
+  const distance=
+    Math.hypot(x,y);
+
+  if(distance>max){
+
+    x=x/distance*max;
+
+    y=y/distance*max;
+
+  }
+
+  joystickX=x/max;
+
+  joystickY=y/max;
+
+  stick.style.transform=
+    `translate(${x}px,${y}px)`;
+
+}
+
+
+function resetJoystick(){
+
+  joystickDragging=false;
+
+  joystickX=0;
+
+  joystickY=0;
+
+  stick.style.transform=
+    "translate(0,0)";
+
+}
+
+
+/* =========================
+   JUMP
+========================= */
+
+function jump(){
+
+  if(onGround){
+
+    verticalVelocity=7.5;
+
+    onGround=false;
+
+  }
+
+}
+
+
+document.getElementById(
+  "jump"
+).onclick=jump;
+
+
+/* =========================
+   FIND NEAREST SQUISHY
+========================= */
+
+function nearestSquishy(){
+
+  let closest=null;
+
+  let distance=3.4;
+
+  for(
+    const squishy
+    of worldSquishies
+  ){
+
+    if(
+      !squishy.group.visible ||
+      squishy.stolen
+    )
+      continue;
+
+    const d=
+      player.position.distanceTo(
+        squishy.group.position
+      );
+
+    if(d<distance){
+
+      distance=d;
+
+      closest=squishy;
+
+    }
+
+  }
+
+  return closest;
+
+}
+
+
+/* =========================
+   INTERACT
+========================= */
+
+function interact(){
+
+  const squishy=
+    nearestSquishy();
+
+
+  if(squishy){
+
+    const data=
+      TYPES[squishy.type];
+
+
+    if(
+      squishy.owner==="npc" &&
+      Date.now()<save.lockUntil
+    ){
+
+      message(
+        "🔒 Your base is locked!"
+      );
+
+      return;
+
+    }
+
+
+    squishy.owner="player";
+
+    squishy.stolen=true;
+
+    squishy.group.visible=false;
+
+
+    if(
+      !save.collection.includes(
+        squishy.type
+      )
+    ){
+
+      save.collection.push(
+        squishy.type
+      );
+
+    }
+
+
+    const reward=
+      Math.floor(
+        data.price*.25
+      );
+
+
+    save.coins+=reward;
+
+
+    addSquishyToBase(
+      squishy.type
+    );
+
+
+    save.placed.push({
+      type:squishy.type
+    });
+
+
+    saveGame();
+
+    updateUI();
+
+
+    message(
+      "🔥 Stole "+
+      data.name+
+      "! +"+
+      reward+
+      " coins"
+    );
+
+    return;
+
+  }
+
+
+  /* SHOP */
+
+  if(
+    Math.abs(player.position.z+8)<5 &&
+    player.position.x>-23 &&
+    player.position.x<23
+  ){
+
+    shop.classList.remove(
+      "hidden"
+    );
+
+    renderShop();
+
+    return;
+
+  }
+
+
+  /* BASE UPGRADE */
+
+  if(
+    distanceToBase(
+      bases[0]
+    )<9
+  ){
+
+    const cost=
+      save.baseLevel*700;
+
+
+    if(
+      save.coins>=cost
+    ){
+
+      save.coins-=cost;
+
+      save.baseLevel++;
+
+      saveGame();
+
+      updateUI();
+
+      message(
+        "🏠 Base upgraded!"
+      );
+
+    }else{
+
+      message(
+        "Need "+
+        cost+
+        " coins"
+      );
+
+    }
+
+  }
+
+}
+
+
+/* =========================
+   BASE DISTANCE
+========================= */
+
+function distanceToBase(base){
+
+  return Math.hypot(
+    player.position.x-base.x,
+    player.position.z-base.z
+  );
+
+}
+
+
+/* =========================
+   PLACE SQUISHY
+========================= */
+
+const baseSlots=[
+  [-29,5],
+  [-25,5],
+  [-21,5],
+  [-29,9],
+  [-25,9],
+  [-21,9],
+  [-29,13],
+  [-25,13],
+  [-21,13]
+];
+
+
+function addSquishyToBase(
+  type,
+  slotIndex=save.placed.length
+){
+
+  const slot=
+    baseSlots[
+      slotIndex%baseSlots.length
+    ];
+
+  const squishy=
+    createSquishy(type);
+
+  squishy.scale.setScalar(.65);
+
+  squishy.position.set(
+    slot[0],
+    0,
+    slot[1]
+  );
+
+  scene.add(squishy);
+
+}
+
+
+/* =========================
+   RESTORE PLAYER BASE
+========================= */
+
+save.placed.forEach(
+  (item,index)=>{
+
+    if(TYPES[item.type]){
+
+      addSquishyToBase(
+        item.type,
+        index
+      );
+
+    }
+
+  }
+);
+
+
+/* =========================
+   SHOP
+========================= */
+
+function renderShop(){
+
+  shopList.innerHTML="";
+
+
+  for(
+    const [id,data]
+    of Object.entries(TYPES)
+  ){
+
+    const row=
+      document.createElement("div");
+
+    row.className="shopItem";
+
+
+    row.innerHTML=`
+      <div>
+        <b>${data.name}</b>
+        <br>
+        <small>
+          ${data.rarity}
+          • +${data.income}/sec
+        </small>
+      </div>
+
+      <button>
+        💰 ${data.price}
+      </button>
+    `;
+
+
+    row.querySelector(
+      "button"
+    ).onclick=()=>{
+
+      if(
+        save.coins<data.price
+      ){
+
+        message(
+          "❌ Not enough coins!"
+        );
+
+        return;
+
+      }
+
+
+      save.coins-=data.price;
+
+
+      if(
+        !save.collection.includes(id)
+      ){
+
+        save.collection.push(id);
+
+      }
+
+
+      save.placed.push({
+        type:id
+      });
+
+
+      addSquishyToBase(
+        id,
+        save.placed.length-1
+      );
+
+
+      saveGame();
+
+      updateUI();
+
+      message(
+        "🛒 Bought "+
+        data.name
+      );
+
+    };
+
+
+    shopList.appendChild(row);
+
+  }
+
+}
+
+
+document.getElementById(
+  "closeShop"
+).onclick=()=>{
+
+  shop.classList.add(
+    "hidden"
+  );
+
+};
+
+
+/* =========================
+   COLLECTION
+========================= */
+
+function renderCollection(){
+
+  collection.innerHTML="";
+
+
+  if(
+    save.collection.length===0
+  ){
+
+    collection.innerHTML=
+      "<p>You don't have any squishies yet!</p>";
+
+    return;
+
+  }
+
+
+  save.collection.forEach(
+    id=>{
+
+      const data=TYPES[id];
+
+      const item=
+        document.createElement("div");
+
+      item.className=
+        "collectionItem";
+
+
+      item.innerHTML=`
+        <span>
+          🧸 <b>${data.name}</b>
+        </span>
+
+        <span>
+          ${data.rarity}
+          <br>
+          +${data.income}/sec
+        </span>
+      `;
+
+
+      collection.appendChild(item);
+
+    }
+  );
+
+}
+
+
+document.getElementById(
+  "collectionButton"
+).onclick=()=>{
+
+  renderCollection();
+
+  collectionPanel.classList.remove(
+    "hidden"
+  );
+
+};
+
+
+document.getElementById(
+  "closeCollection"
+).onclick=()=>{
+
+  collectionPanel.classList.add(
+    "hidden"
+  );
+
+};
+
+
+document.getElementById(
+  "interact"
+).onclick=interact;
+
+
+/* =========================
+   BASE LOCK
+========================= */
+
+lockBtn.onclick=()=>{
+
+  if(
+    Date.now()<save.lockUntil
+  ){
+
+    message(
+      "🔒 Already locked!"
+    );
+
+    return;
+
+  }
+
+
+  save.lockUntil=
+    Date.now()+15000;
+
+
+  saveGame();
+
+
+  message(
+    "🔒 Base locked for 15 seconds!"
+  );
+
+};
+
+
+setInterval(
+  ()=>{
+
+    if(
+      Date.now()<save.lockUntil
+    ){
+
+      lockTimer.textContent=
+        Math.ceil(
+          (save.lockUntil-Date.now())
+          /1000
+        )+"s";
+
+    }else{
+
+      lockTimer.textContent="";
+
+    }
+
+  },
+  100
+);
+
+
+/* =========================
+   PASSIVE INCOME
+========================= */
+
+setInterval(
+  ()=>{
+
+    let income=0;
+
+
+    save.placed.forEach(
+      item=>{
+
+        if(TYPES[item.type]){
+
+          income+=
+            TYPES[item.type].income;
+
+        }
+
+      }
+    );
+
+
+    save.coins+=income;
+
+
+    saveGame();
+
+    updateUI();
+
+  },
+  1000
+);
+
+
+/* =========================
+   PLAYER MOVEMENT
+========================= */
+
+const clock=
+  new THREE.Clock();
+
+
+function updatePlayer(delta){
+
+  let forward=
+    (keys.KeyW?1:0)-
+    (keys.KeyS?1:0)-
+    joystickY;
+
+
+  let right=
+    (keys.KeyD?1:0)-
+    (keys.KeyA?1:0)+
+    joystickX;
+
+
+  const length=
+    Math.hypot(
+      forward,
+      right
+    );
+
+
+  if(length>1){
+
+    forward/=length;
+
+    right/=length;
+
+  }
+
+
+  const speed=7;
+
+
+  const forwardVector=
+    new THREE.Vector3(
+      Math.sin(yaw),
+      0,
+      Math.cos(yaw)
+    );
+
+
+  const rightVector=
+    new THREE.Vector3(
+      Math.cos(yaw),
+      0,
+      -Math.sin(yaw)
+    );
+
+
+  player.position.addScaledVector(
+    forwardVector,
+    forward*speed*delta
+  );
+
+
+  player.position.addScaledVector(
+    rightVector,
+    right*speed*delta
+  );
+
+
+  /* MAP LIMITS */
+
+  player.position.x=
+    Math.max(
+      -80,
+      Math.min(
+        80,
+        player.position.x
+      )
+    );
+
+
+  player.position.z=
+    Math.max(
+      -60,
+      Math.min(
+        60,
+        player.position.z
+      )
+    );
+
+
+  /* GRAVITY */
+
+  verticalVelocity-=
+    20*delta;
+
+
+  player.position.y+=
+    verticalVelocity*delta;
+
+
+  if(
+    player.position.y<=0
+  ){
+
+    player.position.y=0;
+
+    verticalVelocity=0;
+
+    onGround=true;
+
+  }
+
+
+  /* CAMERA */
+
+  const target=
+    new THREE.Vector3(
+      player.position.x,
+      player.position.y+1.6,
+      player.position.z
+    );
+
+
+  const cameraDistance=7;
+
+
+  const desired=
+    target.clone().add(
+      new THREE.Vector3(
+        -Math.sin(yaw)*cameraDistance,
+        3.3-pitch*2,
+        -Math.cos(yaw)*cameraDistance
+      )
+    );
+
+
+  camera.position.lerp(
+    desired,
+    1-Math.pow(.001,delta)
+  );
+
+
+  camera.lookAt(target);
+
+}
+
+
+/* =========================
+   INTERACTION HINT
+========================= */
+
+function updateHint(){
+
+  const squishy=
+    nearestSquishy();
+
+
+  if(squishy){
+
+    const data=
+      TYPES[squishy.type];
+
+
+    interactHint.style.display=
+      "block";
+
+
+    interactHint.textContent=
+      "✋ STEAL "+
+      data.name;
+
+  }else{
+
+    interactHint.style.display=
+      "none";
+
+  }
+
+}
+
+
+/* =========================
+   ANIMATION
+========================= */
+
+function animate(){
+
+  requestAnimationFrame(
+    animate
+  );
+
+
+  const delta=
+    Math.min(
+      clock.getDelta(),
+      .05
+    );
+
+
+  updatePlayer(delta);
+
+  updateHint();
+
+
+  const time=
+    performance.now()*.001;
+
+
+  worldSquishies.forEach(
+    (squishy,index)=>{
+
+      if(
+        squishy.group.visible
+      ){
+
+        /* Squish animation */
+
+        const wave=
+          Math.sin(
+            time*4+index
+          );
+
+
+        squishy.group.scale.x=
+          .98+
+          Math.abs(wave)*.04;
+
+
+        squishy.group.scale.y=
+          1-
+          Math.abs(wave)*.08;
+
+
+        squishy.group.scale.z=
+          .98+
+          Math.abs(wave)*.04;
+
+
+        squishy.group.rotation.y+=
+          delta*.25;
+
+      }
+
+    }
+  );
+
+
+  renderer.render(
+    scene,
+    camera
+  );
+
+}
+
+
+animate();
+
+
+/* =========================
+   RESIZE
+========================= */
+
+addEventListener(
+  "resize",
+  ()=>{
+
+    camera.aspect=
+      innerWidth/
+      innerHeight;
+
+    camera.updateProjectionMatrix();
+
+    renderer.setSize(
+      innerWidth,
+      innerHeight
+    );
+
+  }
+);
+
+
+/* =========================
+   START
+========================= */
+
+updateUI();
+
+setTimeout(
+  ()=>{
+
+    message(
+      "🧸 Find a squishy and press E / ✋ to steal it!"
+    );
+
+  },
+  800
+);
+
+</script>
+
+</body>
+</html>
