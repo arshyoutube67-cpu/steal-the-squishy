@@ -1,646 +1,453 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Steal a Squishy 3D</title>
 
 <style>
-*{
-  box-sizing:border-box;
-  -webkit-tap-highlight-color:transparent;
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#87ceeb;font-family:Arial;touch-action:none}
+canvas{display:block}
+
+#ui{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+z-index:10;
+pointer-events:none;
 }
 
-html,body{
-  margin:0;
-  width:100%;
-  height:100%;
-  overflow:hidden;
-  background:#8ed8ff;
-  font-family:Arial,sans-serif;
-  touch-action:none;
+#top{
+display:flex;
+gap:8px;
+padding:12px;
 }
 
-canvas{
-  display:block;
+.pill{
+background:#151923dd;
+color:white;
+padding:10px 14px;
+border-radius:14px;
+font-weight:bold;
 }
 
 button{
-  font-family:Arial,sans-serif;
-  cursor:pointer;
+border:0;
+border-radius:14px;
+font-weight:bold;
+padding:10px 14px;
 }
 
-#hud{
-  position:fixed;
-  inset:0;
-  z-index:10;
-  pointer-events:none;
+#lock{
+pointer-events:auto;
+background:#151923;
+color:white;
 }
 
-.topbar{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  padding:12px;
+#msg{
+position:absolute;
+top:65px;
+left:50%;
+transform:translateX(-50%);
+background:#151923ee;
+color:white;
+padding:10px 15px;
+border-radius:12px;
+opacity:0;
+transition:.2s;
+white-space:nowrap;
 }
 
-.pill,
-.action{
-  background:rgba(15,20,35,.88);
-  color:white;
-  border:2px solid rgba(255,255,255,.25);
-  border-radius:14px;
-  padding:9px 13px;
-  font-weight:800;
-  box-shadow:0 4px 15px #0005;
-}
+#msg.show{opacity:1}
 
-.action{
-  pointer-events:auto;
-  border:none;
-}
-
-#message{
-  position:absolute;
-  top:70px;
-  left:50%;
-  transform:translateX(-50%);
-  background:rgba(15,20,35,.92);
-  color:white;
-  padding:10px 16px;
-  border-radius:12px;
-  opacity:0;
-  transition:.2s;
-  font-weight:700;
-  white-space:nowrap;
-}
-
-#message.show{
-  opacity:1;
-}
-
-.panel{
-  position:fixed;
-  z-index:30;
-  left:50%;
-  top:50%;
-  transform:translate(-50%,-50%);
-  width:min(92vw,520px);
-  max-height:82vh;
-  overflow:auto;
-  background:rgba(20,24,40,.97);
-  color:white;
-  border:2px solid #ffffff33;
-  border-radius:20px;
-  padding:18px;
-  box-shadow:0 20px 70px #0008;
-}
-
-.hidden{
-  display:none;
-}
-
-.panel h2{
-  margin:0 0 12px;
-}
-
-.shopItem,
-.collectionItem{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-  padding:12px;
-  margin:8px 0;
-  background:#ffffff12;
-  border-radius:14px;
-}
-
-.shopItem button{
-  padding:9px 12px;
-  border:0;
-  border-radius:10px;
-  font-weight:800;
-}
-
-.close{
-  width:100%;
-  padding:12px;
-  border:0;
-  border-radius:12px;
-  font-weight:800;
-  margin-top:10px;
+#hint{
+position:fixed;
+top:58%;
+left:50%;
+transform:translateX(-50%);
+background:#111d;
+color:white;
+padding:10px 15px;
+border-radius:12px;
+display:none;
+z-index:12;
+font-weight:bold;
 }
 
 #controls{
-  position:fixed;
-  z-index:15;
-  inset:0;
-  pointer-events:none;
+position:fixed;
+inset:0;
+z-index:20;
+pointer-events:none;
 }
 
 #joystick{
-  position:absolute;
-  left:20px;
-  bottom:24px;
-  width:130px;
-  height:130px;
-  border-radius:50%;
-  background:#ffffff25;
-  border:2px solid #ffffff55;
-  pointer-events:auto;
+position:absolute;
+left:20px;
+bottom:25px;
+width:125px;
+height:125px;
+border-radius:50%;
+background:#ffffff30;
+border:2px solid #ffffff70;
+pointer-events:auto;
 }
 
 #stick{
-  position:absolute;
-  width:58px;
-  height:58px;
-  left:34px;
-  top:34px;
-  border-radius:50%;
-  background:#ffffff66;
-  border:2px solid #fff;
+position:absolute;
+width:58px;
+height:58px;
+left:31px;
+top:31px;
+border-radius:50%;
+background:#ffffff70;
 }
 
-#rightButtons{
-  position:absolute;
-  right:18px;
-  bottom:20px;
-  display:flex;
-  flex-direction:column;
-  gap:10px;
+#buttons{
+position:absolute;
+right:18px;
+bottom:20px;
+display:flex;
+flex-direction:column;
+gap:10px;
 }
 
-#rightButtons button{
-  width:66px;
-  height:66px;
-  border:0;
-  border-radius:50%;
-  background:#ffffffd5;
-  font-size:25px;
-  pointer-events:auto;
-  box-shadow:0 5px 18px #0004;
-}
-
-#crosshair{
-  position:fixed;
-  z-index:11;
-  left:50%;
-  top:50%;
-  transform:translate(-50%,-50%);
-  color:white;
-  font-size:24px;
-  text-shadow:0 2px 5px black;
-  pointer-events:none;
+#buttons button{
+width:65px;
+height:65px;
+font-size:25px;
+pointer-events:auto;
+background:#ffffffdd;
 }
 
 #help{
-  position:fixed;
-  z-index:11;
-  left:50%;
-  bottom:10px;
-  transform:translateX(-50%);
-  color:white;
-  background:#0008;
-  padding:7px 11px;
-  border-radius:9px;
-  font-size:12px;
-  pointer-events:none;
+position:fixed;
+bottom:10px;
+left:50%;
+transform:translateX(-50%);
+background:#0008;
+color:white;
+padding:6px 10px;
+border-radius:8px;
+font-size:12px;
+z-index:15;
 }
 
-#interactHint{
-  position:fixed;
-  z-index:12;
-  left:50%;
-  top:57%;
-  transform:translateX(-50%);
-  background:#111d;
-  color:white;
-  padding:9px 15px;
-  border-radius:12px;
-  font-weight:bold;
-  display:none;
-  pointer-events:none;
+.panel{
+position:fixed;
+z-index:50;
+left:50%;
+top:50%;
+transform:translate(-50%,-50%);
+width:92%;
+max-width:500px;
+max-height:80%;
+overflow:auto;
+background:#171b29;
+color:white;
+padding:20px;
+border-radius:20px;
+box-shadow:0 20px 60px #0009;
+}
+
+.hidden{display:none}
+
+.item{
+display:flex;
+justify-content:space-between;
+align-items:center;
+background:#ffffff12;
+padding:12px;
+margin:8px 0;
+border-radius:12px;
+}
+
+.close{
+width:100%;
+margin-top:10px;
 }
 
 @media(min-width:800px){
-  #joystick,
-  #rightButtons{
-    display:none;
-  }
+#joystick,#buttons{display:none}
 }
 
 @media(max-width:799px){
-  #help{
-    display:none;
-  }
+#help{display:none}
 }
 </style>
 </head>
 
 <body>
 
-<div id="hud">
-  <div class="topbar">
-    <div class="pill">💰 <span id="coins">0</span></div>
-    <div class="pill">🏠 Lv.<span id="baseLevel">1</span></div>
-    <button id="lockBtn" class="action">
-      🔒 LOCK <span id="lockTimer"></span>
-    </button>
-  </div>
+<div id="ui">
+<div id="top">
 
-  <div id="message"></div>
+<div class="pill">
+💰 <span id="coins">500</span>
 </div>
 
-<div id="interactHint"></div>
+<div class="pill">
+🏠 Lv.<span id="level">1</span>
+</div>
 
-<div id="shop" class="panel hidden">
-  <h2>🛒 Squishy Shop</h2>
-  <div id="shopList"></div>
-  <button class="close" id="closeShop">Close</button>
+<button id="lock">
+🔒 LOCK
+</button>
+
+</div>
+
+<div id="msg"></div>
+</div>
+
+<div id="hint"></div>
+
+<div id="controls">
+
+<div id="joystick">
+<div id="stick"></div>
+</div>
+
+<div id="buttons">
+<button id="jump">⬆️</button>
+<button id="interact">✋</button>
+<button id="collectionButton">🧸</button>
+</div>
+
+</div>
+
+<div id="help">
+WASD = Move • Mouse = Look • E = Steal • Space = Jump
+</div>
+
+<div id="shopPanel" class="panel hidden">
+<h2>🛒 Squishy Shop</h2>
+<div id="shop"></div>
+<button class="close" onclick="closeShop()">Close</button>
 </div>
 
 <div id="collectionPanel" class="panel hidden">
-  <h2>🧸 My Squishies</h2>
-  <div id="collection"></div>
-  <button class="close" id="closeCollection">Close</button>
-</div>
-
-<div id="controls">
-  <div id="joystick">
-    <div id="stick"></div>
-  </div>
-
-  <div id="rightButtons">
-    <button id="jump">⬆️</button>
-    <button id="interact">✋</button>
-    <button id="collectionButton">🧸</button>
-  </div>
-</div>
-
-<div id="crosshair">+</div>
-
-<div id="help">
-  WASD = Move • Mouse = Look • E = Interact • Space = Jump
+<h2>🧸 My Squishies</h2>
+<div id="collection"></div>
+<button class="close" onclick="closeCollection()">Close</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 
 <script>
-/* =========================================================
-   STEAL A SQUISHY 3D
-   ONE-FILE VERSION
-========================================================= */
-
 
 /* =========================
-   THREE.JS SETUP
+GAME DATA
 ========================= */
 
-const scene = new THREE.Scene();
+const SQUISHIES={
 
-scene.background = new THREE.Color(0x8ed8ff);
+butter:{
+name:"Butter Squishy",
+price:60,
+income:2,
+rarity:"Common",
+color:0xffd84a,
+shape:"butter"
+},
 
-scene.fog = new THREE.Fog(
-  0x8ed8ff,
-  35,
-  120
-);
+needoh:{
+name:"NeeDoh Squishy",
+price:120,
+income:5,
+rarity:"Rare",
+color:0x69c9ff,
+shape:"ball"
+},
 
-const camera = new THREE.PerspectiveCamera(
-  70,
-  innerWidth / innerHeight,
-  0.1,
-  250
-);
+burger:{
+name:"Burger Squishy",
+price:300,
+income:12,
+rarity:"Epic",
+color:0xd58a45,
+shape:"burger"
+},
 
-camera.position.set(0,5,14);
+sprite:{
+name:"Sprite Squishy",
+price:500,
+income:20,
+rarity:"Legendary",
+color:0x65d889,
+shape:"can"
+},
 
-const renderer = new THREE.WebGLRenderer({
-  antialias:true
-});
+cola:{
+name:"Coca-Cola Squishy",
+price:750,
+income:30,
+rarity:"Legendary",
+color:0xc52f2f,
+shape:"cola"
+},
 
-renderer.setPixelRatio(
-  Math.min(devicePixelRatio,2)
-);
-
-renderer.setSize(
-  innerWidth,
-  innerHeight
-);
-
-renderer.shadowMap.enabled = true;
-
-document.body.appendChild(
-  renderer.domElement
-);
-
-
-/* =========================
-   LIGHTING
-========================= */
-
-const hemi =
-  new THREE.HemisphereLight(
-    0xffffff,
-    0x557799,
-    2
-  );
-
-scene.add(hemi);
-
-const sun =
-  new THREE.DirectionalLight(
-    0xffffff,
-    2.5
-  );
-
-sun.position.set(
-  20,
-  35,
-  10
-);
-
-sun.castShadow=true;
-
-sun.shadow.mapSize.set(
-  2048,
-  2048
-);
-
-scene.add(sun);
-
-
-/* =========================
-   UI
-========================= */
-
-const coinsEl =
-  document.getElementById("coins");
-
-const baseEl =
-  document.getElementById("baseLevel");
-
-const messageEl =
-  document.getElementById("message");
-
-const lockBtn =
-  document.getElementById("lockBtn");
-
-const lockTimer =
-  document.getElementById("lockTimer");
-
-const interactHint =
-  document.getElementById("interactHint");
-
-const shop =
-  document.getElementById("shop");
-
-const collectionPanel =
-  document.getElementById("collectionPanel");
-
-const shopList =
-  document.getElementById("shopList");
-
-const collection =
-  document.getElementById("collection");
-
-
-function message(text){
-
-  messageEl.textContent=text;
-
-  messageEl.classList.add("show");
-
-  clearTimeout(message.timer);
-
-  message.timer=setTimeout(()=>{
-    messageEl.classList.remove("show");
-  },1800);
+pepsi:{
+name:"Pepsi Squishy",
+price:1000,
+income:45,
+rarity:"Mythic",
+color:0x3575dc,
+shape:"pepsi"
 }
-
-
-/* =========================
-   GAME DATA
-========================= */
-
-const TYPES={
-
-  butter:{
-    name:"Butter Squishy",
-    price:60,
-    income:2,
-    rarity:"Common",
-    color:0xffd84a,
-    shape:"butter"
-  },
-
-  needoh:{
-    name:"NeeDoh Squishy",
-    price:120,
-    income:5,
-    rarity:"Rare",
-    color:0x69c9ff,
-    shape:"ball"
-  },
-
-  burger:{
-    name:"Burger Squishy",
-    price:300,
-    income:12,
-    rarity:"Epic",
-    color:0xd58a45,
-    shape:"burger"
-  },
-
-  sprite:{
-    name:"Sprite Squishy",
-    price:500,
-    income:20,
-    rarity:"Legendary",
-    color:0x8adf8b,
-    shape:"can"
-  },
-
-  cola:{
-    name:"Coca-Cola Squishy",
-    price:750,
-    income:30,
-    rarity:"Legendary",
-    color:0xc52f2f,
-    shape:"cola"
-  },
-
-  pepsi:{
-    name:"Pepsi Squishy",
-    price:1000,
-    income:45,
-    rarity:"Mythic",
-    color:0x3575dc,
-    shape:"pepsi"
-  }
 
 };
 
 
 /* =========================
-   SAVE SYSTEM
+SAVE
 ========================= */
 
 let save;
 
 try{
-
-  save =
-    JSON.parse(
-      localStorage.getItem(
-        "stealASquishySave"
-      )
-    );
-
+save=JSON.parse(localStorage.getItem("squishySave"));
 }catch(e){
-
-  save=null;
-
+save=null;
 }
 
 if(!save){
 
-  save={
-    coins:500,
-    baseLevel:1,
-    collection:[],
-    placed:[],
-    lockUntil:0
-  };
+save={
+coins:500,
+level:1,
+collection:[],
+placed:[],
+lockUntil:0
+};
 
 }
 
-if(!Array.isArray(save.collection))
-  save.collection=[];
-
-if(!Array.isArray(save.placed))
-  save.placed=[];
-
+if(!save.collection)save.collection=[];
+if(!save.placed)save.placed=[];
 
 function saveGame(){
 
-  localStorage.setItem(
-    "stealASquishySave",
-    JSON.stringify(save)
-  );
+localStorage.setItem(
+"squishySave",
+JSON.stringify(save)
+);
 
 }
-
 
 function updateUI(){
 
-  coinsEl.textContent =
-    Math.floor(save.coins);
+document.getElementById("coins").textContent=
+Math.floor(save.coins);
 
-  baseEl.textContent =
-    save.baseLevel;
-
-}
-
-
-/* =========================
-   WORLD HELPERS
-========================= */
-
-function material(color){
-
-  return new THREE.MeshStandardMaterial({
-    color:color,
-    roughness:.65,
-    metalness:.02
-  });
-
-}
-
-
-function makeBox(
-  width,
-  height,
-  depth,
-  color,
-  x,
-  y,
-  z
-){
-
-  const mesh =
-    new THREE.Mesh(
-      new THREE.BoxGeometry(
-        width,
-        height,
-        depth
-      ),
-      material(color)
-    );
-
-  mesh.position.set(
-    x,y,z
-  );
-
-  mesh.castShadow=true;
-  mesh.receiveShadow=true;
-
-  scene.add(mesh);
-
-  return mesh;
-
-}
-
-
-function makeCylinder(
-  radius,
-  height,
-  color,
-  x,
-  y,
-  z
-){
-
-  const mesh =
-    new THREE.Mesh(
-      new THREE.CylinderGeometry(
-        radius,
-        radius,
-        height,
-        32
-      ),
-      material(color)
-    );
-
-  mesh.position.set(
-    x,y,z
-  );
-
-  mesh.castShadow=true;
-  mesh.receiveShadow=true;
-
-  scene.add(mesh);
-
-  return mesh;
+document.getElementById("level").textContent=
+save.level;
 
 }
 
 
 /* =========================
-   GROUND
+THREE
 ========================= */
 
-const ground =
-  new THREE.Mesh(
-    new THREE.PlaneGeometry(
-      180,
-      180
-    ),
-    material(0x5bb85b)
-  );
+const scene=new THREE.Scene();
 
-ground.rotation.x=-Math.PI/2;
+scene.background=
+new THREE.Color(0x87ceeb);
+
+scene.fog=
+new THREE.Fog(
+0x87ceeb,
+35,
+120
+);
+
+const camera=
+new THREE.PerspectiveCamera(
+70,
+innerWidth/innerHeight,
+.1,
+300
+);
+
+const renderer=
+new THREE.WebGLRenderer({
+antialias:true
+});
+
+renderer.setSize(
+innerWidth,
+innerHeight
+);
+
+renderer.setPixelRatio(
+Math.min(devicePixelRatio,2)
+);
+
+renderer.shadowMap.enabled=true;
+
+document.body.appendChild(
+renderer.domElement
+);
+
+
+/* LIGHT */
+
+scene.add(
+new THREE.HemisphereLight(
+0xffffff,
+0x557799,
+2
+)
+);
+
+const sun=
+new THREE.DirectionalLight(
+0xffffff,
+2.5
+);
+
+sun.position.set(
+20,
+40,
+15
+);
+
+sun.castShadow=true;
+
+scene.add(sun);
+
+
+/* =========================
+MATERIAL
+========================= */
+
+function mat(color){
+
+return new THREE.MeshStandardMaterial({
+color:color,
+roughness:.6
+});
+
+}
+
+
+/* =========================
+GROUND
+========================= */
+
+const ground=
+new THREE.Mesh(
+new THREE.PlaneGeometry(
+180,
+180
+),
+mat(0x58b957)
+);
+
+ground.rotation.x=
+-Math.PI/2;
 
 ground.receiveShadow=true;
 
@@ -648,1710 +455,1530 @@ scene.add(ground);
 
 
 /* =========================
-   ROAD
+ROAD
 ========================= */
 
-makeBox(
-  180,
-  .05,
-  11,
-  0x3f4650,
-  0,
-  0,
-  -8
+function box(
+w,h,d,c,x,y,z
+){
+
+const m=
+new THREE.Mesh(
+new THREE.BoxGeometry(
+w,h,d
+),
+mat(c)
+);
+
+m.position.set(
+x,y,z
+);
+
+m.castShadow=true;
+m.receiveShadow=true;
+
+scene.add(m);
+
+return m;
+
+}
+
+box(
+180,
+.05,
+11,
+0x40444d,
+0,
+0,
+-8
 );
 
 for(
-  let x=-80;
-  x<80;
-  x+=8
+let x=-80;
+x<80;
+x+=8
 ){
 
-  makeBox(
-    4,
-    .06,
-    .25,
-    0xf2d35e,
-    x,
-    .05,
-    -8
-  );
+box(
+4,
+.06,
+.25,
+0xf4d35e,
+x,
+.05,
+-8
+);
 
 }
 
 
 /* =========================
-   BUILDINGS
+BUILDINGS
 ========================= */
 
 for(
-  let i=0;
-  i<38;
-  i++
+let i=0;
+i<35;
+i++
 ){
 
-  const side =
-    Math.random()>0.5
-    ? 1
-    : -1;
+const side=
+Math.random()>.5?1:-1;
 
-  const x =
-    side *
-    (40 + Math.random()*35);
+const x=
+side*(40+Math.random()*35);
 
-  const z =
-    -50 + Math.random()*100;
+const z=
+-50+Math.random()*100;
 
-  const height =
-    4 + Math.random()*12;
+const h=
+4+Math.random()*13;
 
-  makeBox(
-    4+Math.random()*5,
-    height,
-    4+Math.random()*5,
-    0x8998a8,
-    x,
-    height/2,
-    z
-  );
+box(
+5,
+h,
+5,
+0x8997a6,
+x,
+h/2,
+z
+);
 
 }
 
 
 /* =========================
-   TEXT SPRITES
+BASES
 ========================= */
 
-function textSprite(text){
+const bases=[
+[-25,8,0x4c7dff,"YOUR BASE"],
+[25,8,0xff6666,"NPC BASE"],
+[-25,-28,0xa96cff,"NPC BASE"],
+[25,-28,0xff9f43,"NPC BASE"]
+];
 
-  const canvas =
-    document.createElement("canvas");
+function makeText(text){
 
-  canvas.width=512;
-  canvas.height=128;
+const canvas=
+document.createElement("canvas");
 
-  const ctx =
-    canvas.getContext("2d");
+canvas.width=512;
+canvas.height=128;
 
-  ctx.fillStyle="white";
+const ctx=
+canvas.getContext("2d");
 
-  ctx.font=
-    "bold 55px Arial";
+ctx.fillStyle="white";
 
-  ctx.textAlign="center";
+ctx.font=
+"bold 55px Arial";
 
-  ctx.fillText(
-    text,
-    256,
-    75
-  );
+ctx.textAlign="center";
 
-  const texture =
-    new THREE.CanvasTexture(canvas);
+ctx.fillText(
+text,
+256,
+75
+);
 
-  const sprite =
-    new THREE.Sprite(
-      new THREE.SpriteMaterial({
-        map:texture,
-        transparent:true
-      })
-    );
+const texture=
+new THREE.CanvasTexture(
+canvas
+);
 
-  sprite.scale.set(
-    7,
-    1.75,
-    1
-  );
+const sprite=
+new THREE.Sprite(
+new THREE.SpriteMaterial({
+map:texture,
+transparent:true
+})
+);
 
-  return sprite;
+sprite.scale.set(
+7,
+1.7,
+1
+);
+
+return sprite;
 
 }
 
+bases.forEach(b=>{
 
-/* =========================
-   BASES
-========================= */
-
-const bases=[];
-
-
-function createBase(
-  x,
-  z,
-  color,
-  name
-){
-
-  const floor =
-    new THREE.Mesh(
-      new THREE.BoxGeometry(
-        16,
-        .6,
-        13
-      ),
-      material(color)
-    );
-
-  floor.position.set(
-    x,
-    .3,
-    z
-  );
-
-  floor.receiveShadow=true;
-
-  scene.add(floor);
-
-
-  const sign =
-    textSprite(name);
-
-  sign.position.set(
-    x,
-    2.7,
-    z-6.5
-  );
-
-  scene.add(sign);
-
-
-  bases.push({
-    x:x,
-    z:z,
-    locked:false
-  });
-
-}
-
-
-createBase(
-  -25,
-  8,
-  0x4c7dff,
-  "YOUR BASE"
+box(
+16,
+.6,
+13,
+b[2],
+b[0],
+.3,
+b[1]
 );
 
-createBase(
-  25,
-  8,
-  0xff6666,
-  "NPC BASE"
+const sign=
+makeText(b[3]);
+
+sign.position.set(
+b[0],
+2.7,
+b[1]-6.5
 );
 
-createBase(
-  -25,
-  -28,
-  0xa96cff,
-  "NPC BASE"
-);
-
-createBase(
-  25,
-  -28,
-  0xff9f43,
-  "NPC BASE"
-);
-
-
-/* =========================
-   SQUISHY FACE
-========================= */
-
-function makeEye(
-  x,
-  y,
-  z,
-  size=.16
-){
-
-  const eye =
-    new THREE.Mesh(
-      new THREE.SphereGeometry(
-        size,
-        16,
-        16
-      ),
-      material(0x111111)
-    );
-
-  eye.position.set(
-    x,y,z
-  );
-
-  return eye;
-
-}
-
-
-/* =========================
-   CREATE 3D SQUISHY
-========================= */
-
-function createSquishy(type){
-
-  const data=TYPES[type];
-
-  const group=
-    new THREE.Group();
-
-  group.userData.type=type;
-
-  let faceZ=-1.05;
-
-
-  /* BUTTER */
-
-  if(data.shape==="butter"){
-
-    const body =
-      new THREE.Mesh(
-        new THREE.BoxGeometry(
-          2.2,
-          1,
-          1.4
-        ),
-        material(data.color)
-      );
-
-    body.position.y=.65;
-
-    group.add(body);
-
-
-    const top =
-      new THREE.Mesh(
-        new THREE.BoxGeometry(
-          1.7,
-          .1,
-          1.1
-        ),
-        material(0xffef9b)
-      );
-
-    top.position.y=1.18;
-
-    group.add(top);
-
-  }
-
-
-  /* BURGER */
-
-  else if(data.shape==="burger"){
-
-    const bunTop =
-      new THREE.Mesh(
-        new THREE.SphereGeometry(
-          1.25,
-          24,
-          16,
-          0,
-          Math.PI*2,
-          0,
-          Math.PI/2
-        ),
-        material(0xe9a04c)
-      );
-
-    bunTop.scale.set(
-      1.25,
-      .65,
-      1
-    );
-
-    bunTop.position.y=.95;
-
-    group.add(bunTop);
-
-
-    const patty =
-      new THREE.Mesh(
-        new THREE.BoxGeometry(
-          2.35,
-          .42,
-          1.7
-        ),
-        material(0x673218)
-      );
-
-    patty.position.y=.57;
-
-    group.add(patty);
-
-
-    const cheese =
-      new THREE.Mesh(
-        new THREE.BoxGeometry(
-          2.5,
-          .16,
-          1.8
-        ),
-        material(0xffd13b)
-      );
-
-    cheese.position.y=.79;
-
-    group.add(cheese);
-
-
-    const bottom =
-      new THREE.Mesh(
-        new THREE.CylinderGeometry(
-          1.15,
-          1.15,
-          .45,
-          32
-        ),
-        material(0xd9813a)
-      );
-
-    bottom.position.y=.32;
-
-    group.add(bottom);
-
-    faceZ=-1.02;
-
-  }
-
-
-  /* DRINK CANS */
-
-  else if(data.shape==="can"){
-
-    const can =
-      new THREE.Mesh(
-        new THREE.CylinderGeometry(
-          .75,
-          .75,
-          2.1,
-          32
-        ),
-        material(data.color)
-      );
-
-    can.position.y=1.05;
-
-    group.add(can);
-
-
-    const top =
-      new THREE.Mesh(
-        new THREE.CylinderGeometry(
-          .68,
-          .68,
-          .08,
-          32
-        ),
-        material(0xc9cdd0)
-      );
-
-    top.position.y=2.12;
-
-    group.add(top);
-
-
-    const stripe =
-      new THREE.Mesh(
-        new THREE.CylinderGeometry(
-          .76,
-          .76,
-          .15,
-          32
-        ),
-        material(0xffffff)
-      );
-
-    stripe.position.y=1.15;
-
-    group.add(stripe);
-
-    faceZ=-.77;
-
-  }
-
-
-  /* NEEDOH */
-
-  else{
-
-    const body =
-      new THREE.Mesh(
-        new THREE.SphereGeometry(
-          1.15,
-          32,
-          24
-        ),
-        material(data.color)
-      );
-
-    body.scale.set(
-      1,
-      1.03,
-      .95
-    );
-
-    body.position.y=1.05;
-
-    group.add(body);
-
-    faceZ=-1.02;
-
-  }
-
-
-  /* FACE */
-
-  const eye1=
-    makeEye(
-      -.34,
-      1.3,
-      faceZ
-    );
-
-  const eye2=
-    makeEye(
-      .34,
-      1.3,
-      faceZ
-    );
-
-  group.add(
-    eye1,
-    eye2
-  );
-
-
-  const mouth =
-    new THREE.Mesh(
-      new THREE.TorusGeometry(
-        .18,
-        .045,
-        8,
-        20,
-        Math.PI
-      ),
-      material(0x222222)
-    );
-
-  mouth.rotation.x=Math.PI;
-
-  mouth.position.set(
-    0,
-    .88,
-    faceZ-.03
-  );
-
-  group.add(mouth);
-
-
-  group.traverse(
-    object=>{
-
-      if(object.isMesh){
-
-        object.castShadow=true;
-        object.receiveShadow=true;
-
-      }
-
-    }
-  );
-
-
-  return group;
-
-}
-
-
-/* =========================
-   WORLD SQUISHIES
-========================= */
-
-const worldSquishies=[];
-
-
-function addWorldSquishy(
-  type,
-  x,
-  z,
-  owner="wild"
-){
-
-  const group=
-    createSquishy(type);
-
-  group.position.set(
-    x,
-    0,
-    z
-  );
-
-  scene.add(group);
-
-
-  const squishy={
-    group:group,
-    type:type,
-    owner:owner,
-    stolen:false,
-    homeX:x,
-    homeZ:z
-  };
-
-
-  worldSquishies.push(
-    squishy
-  );
-
-  return squishy;
-
-}
-
-
-/* ROAD SQUISHIES */
-
-addWorldSquishy(
-  "butter",
-  -10,
-  -8
-);
-
-addWorldSquishy(
-  "needoh",
-  -5,
-  -8
-);
-
-addWorldSquishy(
-  "burger",
-  1,
-  -8
-);
-
-addWorldSquishy(
-  "sprite",
-  7,
-  -8
-);
-
-addWorldSquishy(
-  "cola",
-  13,
-  -8
-);
-
-addWorldSquishy(
-  "pepsi",
-  19,
-  -8
-);
-
-
-/* NPC BASE SQUISHIES */
-
-[
-  ["butter",21,8],
-  ["needoh",25,8],
-  ["burger",29,8],
-  ["sprite",21,12],
-  ["cola",25,12],
-  ["pepsi",29,12],
-
-  ["butter",-21,-28],
-  ["needoh",-25,-28],
-  ["burger",-29,-28],
-
-  ["sprite",21,-28],
-  ["cola",25,-28],
-  ["pepsi",29,-28]
-
-].forEach(item=>{
-
-  const s=
-    addWorldSquishy(
-      item[0],
-      item[1],
-      item[2],
-      "npc"
-    );
-
-  s.group.scale.setScalar(.72);
+scene.add(sign);
 
 });
 
 
 /* =========================
-   PLAYER
+SQUISHY CREATOR
 ========================= */
 
-const player=
-  new THREE.Group();
+function eye(x,y,z){
 
-scene.add(player);
-
-
-const playerBody =
-  new THREE.Mesh(
-    new THREE.CapsuleGeometry(
-      .45,
-      1.1,
-      6,
-      12
-    ),
-    material(0x286cff)
-  );
-
-playerBody.position.y=1.15;
-
-playerBody.castShadow=true;
-
-player.add(playerBody);
-
-
-const playerHead =
-  new THREE.Mesh(
-    new THREE.SphereGeometry(
-      .48,
-      20,
-      16
-    ),
-    material(0xffc28b)
-  );
-
-playerHead.position.y=2.05;
-
-playerHead.castShadow=true;
-
-player.add(playerHead);
-
-
-player.position.set(
-  -25,
-  0,
-  14
+const e=
+new THREE.Mesh(
+new THREE.SphereGeometry(
+.15,
+16,
+16
+),
+mat(0x111111)
 );
+
+e.position.set(
+x,y,z
+);
+
+return e;
+
+}
+
+
+function createSquishy(type){
+
+const d=
+SQUISHIES[type];
+
+const g=
+new THREE.Group();
+
+let faceZ=-1;
+
+if(d.shape==="butter"){
+
+const body=
+new THREE.Mesh(
+new THREE.BoxGeometry(
+2.2,
+1,
+1.4
+),
+mat(d.color)
+);
+
+body.position.y=.65;
+
+g.add(body);
+
+const top=
+new THREE.Mesh(
+new THREE.BoxGeometry(
+1.7,
+.1,
+1.1
+),
+mat(0xffefa0)
+);
+
+top.position.y=1.18;
+
+g.add(top);
+
+faceZ=-.72;
+
+}
+
+
+else if(d.shape==="burger"){
+
+const top=
+new THREE.Mesh(
+new THREE.SphereGeometry(
+1.25,
+24,
+16,
+0,
+Math.PI*2,
+0,
+Math.PI/2
+),
+mat(0xe9a04c)
+);
+
+top.scale.set(
+1.25,
+.65,
+1
+);
+
+top.position.y=.95;
+
+g.add(top);
+
+
+const patty=
+new THREE.Mesh(
+new THREE.BoxGeometry(
+2.35,
+.42,
+1.7
+),
+mat(0x69351d)
+);
+
+patty.position.y=.55;
+
+g.add(patty);
+
+
+const cheese=
+new THREE.Mesh(
+new THREE.BoxGeometry(
+2.5,
+.16,
+1.8
+),
+mat(0xffd13b)
+);
+
+cheese.position.y=.79;
+
+g.add(cheese);
+
+
+const bottom=
+new THREE.Mesh(
+new THREE.CylinderGeometry(
+1.15,
+1.15,
+.45,
+32
+),
+mat(0xd9813a)
+);
+
+bottom.position.y=.32;
+
+g.add(bottom);
+
+faceZ=-1;
+
+}
+
+
+else if(d.shape==="can"){
+
+const can=
+new THREE.Mesh(
+new THREE.CylinderGeometry(
+.75,
+.75,
+2.1,
+32
+),
+mat(d.color)
+);
+
+can.position.y=1.05;
+
+g.add(can);
+
+
+const top=
+new THREE.Mesh(
+new THREE.CylinderGeometry(
+.68,
+.68,
+.08,
+32
+),
+mat(0xc9cdd0)
+);
+
+top.position.y=2.12;
+
+g.add(top);
+
+
+const stripe=
+new THREE.Mesh(
+new THREE.CylinderGeometry(
+.76,
+.76,
+.15,
+32
+),
+mat(0xffffff)
+);
+
+stripe.position.y=1.15;
+
+g.add(stripe);
+
+faceZ=-.76;
+
+}
+
+
+else{
+
+const ball=
+new THREE.Mesh(
+new THREE.SphereGeometry(
+1.15,
+32,
+24
+),
+mat(d.color)
+);
+
+ball.position.y=1.05;
+
+g.add(ball);
+
+faceZ=-1;
+
+}
+
+
+/* FACE */
+
+g.add(
+eye(-.34,1.3,faceZ),
+eye(.34,1.3,faceZ)
+);
+
+const mouth=
+new THREE.Mesh(
+new THREE.TorusGeometry(
+.18,
+.045,
+8,
+20,
+Math.PI
+),
+mat(0x222222)
+);
+
+mouth.rotation.x=Math.PI;
+
+mouth.position.set(
+0,
+.88,
+faceZ-.03
+);
+
+g.add(mouth);
+
+
+g.traverse(o=>{
+
+if(o.isMesh){
+
+o.castShadow=true;
+o.receiveShadow=true;
+
+}
+
+});
+
+return g;
+
+}
 
 
 /* =========================
-   PLAYER CONTROL
+WORLD SQUISHIES
 ========================= */
+
+const world=[];
+
+function spawn(
+type,
+x,
+z,
+owner="wild"
+){
+
+const g=
+createSquishy(type);
+
+g.position.set(
+x,
+0,
+z
+);
+
+scene.add(g);
+
+const s={
+group:g,
+type:type,
+owner:owner,
+stolen:false
+};
+
+world.push(s);
+
+return s;
+
+}
+
+
+/* ROAD */
+
+spawn("butter",-10,-8);
+spawn("needoh",-5,-8);
+spawn("burger",1,-8);
+spawn("sprite",7,-8);
+spawn("cola",13,-8);
+spawn("pepsi",19,-8);
+
+
+/* NPC BASES */
+
+spawn("butter",21,8,"npc");
+spawn("needoh",25,8,"npc");
+spawn("burger",29,8,"npc");
+spawn("sprite",21,12,"npc");
+spawn("cola",25,12,"npc");
+spawn("pepsi",29,12,"npc");
+
+spawn("butter",-21,-28,"npc");
+spawn("needoh",-25,-28,"npc");
+spawn("burger",-29,-28,"npc");
+
+spawn("sprite",21,-28,"npc");
+spawn("cola",25,-28,"npc");
+spawn("pepsi",29,-28,"npc");
+
+
+/* =========================
+PLAYER
+========================= */
+
+const player=
+new THREE.Group();
+
+scene.add(player);
+
+const body=
+new THREE.Mesh(
+new THREE.CapsuleGeometry(
+.45,
+1.1,
+6,
+12
+),
+mat(0x276cff)
+);
+
+body.position.y=1.15;
+
+player.add(body);
+
+
+const head=
+new THREE.Mesh(
+new THREE.SphereGeometry(
+.48,
+20,
+16
+),
+mat(0xffc28b)
+);
+
+head.position.y=2.05;
+
+player.add(head);
+
+player.position.set(
+-25,
+0,
+14
+);
+
 
 let yaw=0;
 
 let pitch=-.15;
 
-let verticalVelocity=0;
+let velocityY=0;
 
-let onGround=true;
+let grounded=true;
 
 const keys={};
 
 
 addEventListener(
-  "keydown",
-  event=>{
+"keydown",
+e=>{
 
-    keys[event.code]=true;
+keys[e.code]=true;
 
-    if(event.code==="KeyE")
-      interact();
+if(e.code==="KeyE")
+interact();
 
-    if(event.code==="Space")
-      jump();
+if(e.code==="Space")
+jump();
 
-  }
+}
 );
 
 
 addEventListener(
-  "keyup",
-  event=>{
-    keys[event.code]=false;
-  }
+"keyup",
+e=>{
+keys[e.code]=false;
+}
 );
 
 
 /* =========================
-   MOUSE LOOK
+MOUSE
 ========================= */
 
 renderer.domElement.addEventListener(
-  "click",
-  ()=>{
+"click",
+()=>{
 
-    if(innerWidth>=800){
+if(innerWidth>=800){
 
-      renderer.domElement.requestPointerLock();
+renderer.domElement.requestPointerLock();
 
-    }
+}
 
-  }
+}
 );
 
 
 addEventListener(
-  "mousemove",
-  event=>{
+"mousemove",
+e=>{
 
-    if(
-      document.pointerLockElement===
-      renderer.domElement
-    ){
+if(
+document.pointerLockElement===
+renderer.domElement
+){
 
-      yaw-=event.movementX*.0025;
+yaw-=
+e.movementX*.0025;
 
-      pitch-=event.movementY*.0025;
+pitch-=
+e.movementY*.0025;
 
-      pitch=Math.max(
-        -1.1,
-        Math.min(.6,pitch)
-      );
+pitch=
+Math.max(
+-1.1,
+Math.min(.6,pitch)
+);
 
-    }
+}
 
-  }
+}
 );
 
 
 /* =========================
-   MOBILE JOYSTICK
+MOBILE JOYSTICK
 ========================= */
 
 const joystick=
-  document.getElementById(
-    "joystick"
-  );
+document.getElementById(
+"joystick"
+);
 
 const stick=
-  document.getElementById(
-    "stick"
-  );
+document.getElementById(
+"stick"
+);
 
-let joystickX=0;
-
-let joystickY=0;
-
-let joystickDragging=false;
+let joyX=0;
+let joyY=0;
+let dragging=false;
 
 
 joystick.addEventListener(
-  "pointerdown",
-  event=>{
+"pointerdown",
+e=>{
 
-    joystickDragging=true;
+dragging=true;
 
-    joystick.setPointerCapture(
-      event.pointerId
-    );
+joystick.setPointerCapture(
+e.pointerId
+);
 
-    moveJoystick(event);
+moveJoy(e);
 
-  }
+}
 );
 
 
 joystick.addEventListener(
-  "pointermove",
-  event=>{
+"pointermove",
+e=>{
 
-    if(joystickDragging)
-      moveJoystick(event);
+if(dragging)
+moveJoy(e);
 
-  }
+}
 );
 
 
 joystick.addEventListener(
-  "pointerup",
-  resetJoystick
+"pointerup",
+resetJoy
 );
 
 
 joystick.addEventListener(
-  "pointercancel",
-  resetJoystick
+"pointercancel",
+resetJoy
 );
 
 
-function moveJoystick(event){
+function moveJoy(e){
 
-  const rect=
-    joystick.getBoundingClientRect();
+const r=
+joystick.getBoundingClientRect();
 
-  const centerX=
-    rect.left+
-    rect.width/2;
+let x=
+e.clientX-
+(r.left+r.width/2);
 
-  const centerY=
-    rect.top+
-    rect.height/2;
+let y=
+e.clientY-
+(r.top+r.height/2);
 
-  let x=
-    event.clientX-centerX;
+const max=42;
 
-  let y=
-    event.clientY-centerY;
+const d=
+Math.hypot(x,y);
 
-  const max=42;
+if(d>max){
 
-  const distance=
-    Math.hypot(x,y);
+x=x/d*max;
+y=y/d*max;
 
-  if(distance>max){
+}
 
-    x=x/distance*max;
+joyX=x/max;
+joyY=y/max;
 
-    y=y/distance*max;
-
-  }
-
-  joystickX=x/max;
-
-  joystickY=y/max;
-
-  stick.style.transform=
-    `translate(${x}px,${y}px)`;
+stick.style.transform=
+`translate(${x}px,${y}px)`;
 
 }
 
 
-function resetJoystick(){
+function resetJoy(){
 
-  joystickDragging=false;
+dragging=false;
 
-  joystickX=0;
+joyX=0;
+joyY=0;
 
-  joystickY=0;
-
-  stick.style.transform=
-    "translate(0,0)";
-
-}
-
-
-/* =========================
-   JUMP
-========================= */
-
-function jump(){
-
-  if(onGround){
-
-    verticalVelocity=7.5;
-
-    onGround=false;
-
-  }
+stick.style.transform=
+"translate(0,0)";
 
 }
 
 
 document.getElementById(
-  "jump"
+"jump"
 ).onclick=jump;
 
 
-/* =========================
-   FIND NEAREST SQUISHY
-========================= */
-
-function nearestSquishy(){
-
-  let closest=null;
-
-  let distance=3.4;
-
-  for(
-    const squishy
-    of worldSquishies
-  ){
-
-    if(
-      !squishy.group.visible ||
-      squishy.stolen
-    )
-      continue;
-
-    const d=
-      player.position.distanceTo(
-        squishy.group.position
-      );
-
-    if(d<distance){
-
-      distance=d;
-
-      closest=squishy;
-
-    }
-
-  }
-
-  return closest;
-
-}
-
-
-/* =========================
-   INTERACT
-========================= */
-
-function interact(){
-
-  const squishy=
-    nearestSquishy();
-
-
-  if(squishy){
-
-    const data=
-      TYPES[squishy.type];
-
-
-    if(
-      squishy.owner==="npc" &&
-      Date.now()<save.lockUntil
-    ){
-
-      message(
-        "🔒 Your base is locked!"
-      );
-
-      return;
-
-    }
-
-
-    squishy.owner="player";
-
-    squishy.stolen=true;
-
-    squishy.group.visible=false;
-
-
-    if(
-      !save.collection.includes(
-        squishy.type
-      )
-    ){
-
-      save.collection.push(
-        squishy.type
-      );
-
-    }
-
-
-    const reward=
-      Math.floor(
-        data.price*.25
-      );
-
-
-    save.coins+=reward;
-
-
-    addSquishyToBase(
-      squishy.type
-    );
-
-
-    save.placed.push({
-      type:squishy.type
-    });
-
-
-    saveGame();
-
-    updateUI();
-
-
-    message(
-      "🔥 Stole "+
-      data.name+
-      "! +"+
-      reward+
-      " coins"
-    );
-
-    return;
-
-  }
-
-
-  /* SHOP */
-
-  if(
-    Math.abs(player.position.z+8)<5 &&
-    player.position.x>-23 &&
-    player.position.x<23
-  ){
-
-    shop.classList.remove(
-      "hidden"
-    );
-
-    renderShop();
-
-    return;
-
-  }
-
-
-  /* BASE UPGRADE */
-
-  if(
-    distanceToBase(
-      bases[0]
-    )<9
-  ){
-
-    const cost=
-      save.baseLevel*700;
-
-
-    if(
-      save.coins>=cost
-    ){
-
-      save.coins-=cost;
-
-      save.baseLevel++;
-
-      saveGame();
-
-      updateUI();
-
-      message(
-        "🏠 Base upgraded!"
-      );
-
-    }else{
-
-      message(
-        "Need "+
-        cost+
-        " coins"
-      );
-
-    }
-
-  }
-
-}
-
-
-/* =========================
-   BASE DISTANCE
-========================= */
-
-function distanceToBase(base){
-
-  return Math.hypot(
-    player.position.x-base.x,
-    player.position.z-base.z
-  );
-
-}
-
-
-/* =========================
-   PLACE SQUISHY
-========================= */
-
-const baseSlots=[
-  [-29,5],
-  [-25,5],
-  [-21,5],
-  [-29,9],
-  [-25,9],
-  [-21,9],
-  [-29,13],
-  [-25,13],
-  [-21,13]
-];
-
-
-function addSquishyToBase(
-  type,
-  slotIndex=save.placed.length
-){
-
-  const slot=
-    baseSlots[
-      slotIndex%baseSlots.length
-    ];
-
-  const squishy=
-    createSquishy(type);
-
-  squishy.scale.setScalar(.65);
-
-  squishy.position.set(
-    slot[0],
-    0,
-    slot[1]
-  );
-
-  scene.add(squishy);
-
-}
-
-
-/* =========================
-   RESTORE PLAYER BASE
-========================= */
-
-save.placed.forEach(
-  (item,index)=>{
-
-    if(TYPES[item.type]){
-
-      addSquishyToBase(
-        item.type,
-        index
-      );
-
-    }
-
-  }
-);
-
-
-/* =========================
-   SHOP
-========================= */
-
-function renderShop(){
-
-  shopList.innerHTML="";
-
-
-  for(
-    const [id,data]
-    of Object.entries(TYPES)
-  ){
-
-    const row=
-      document.createElement("div");
-
-    row.className="shopItem";
-
-
-    row.innerHTML=`
-      <div>
-        <b>${data.name}</b>
-        <br>
-        <small>
-          ${data.rarity}
-          • +${data.income}/sec
-        </small>
-      </div>
-
-      <button>
-        💰 ${data.price}
-      </button>
-    `;
-
-
-    row.querySelector(
-      "button"
-    ).onclick=()=>{
-
-      if(
-        save.coins<data.price
-      ){
-
-        message(
-          "❌ Not enough coins!"
-        );
-
-        return;
-
-      }
-
-
-      save.coins-=data.price;
-
-
-      if(
-        !save.collection.includes(id)
-      ){
-
-        save.collection.push(id);
-
-      }
-
-
-      save.placed.push({
-        type:id
-      });
-
-
-      addSquishyToBase(
-        id,
-        save.placed.length-1
-      );
-
-
-      saveGame();
-
-      updateUI();
-
-      message(
-        "🛒 Bought "+
-        data.name
-      );
-
-    };
-
-
-    shopList.appendChild(row);
-
-  }
-
-}
-
-
 document.getElementById(
-  "closeShop"
-).onclick=()=>{
-
-  shop.classList.add(
-    "hidden"
-  );
-
-};
-
-
-/* =========================
-   COLLECTION
-========================= */
-
-function renderCollection(){
-
-  collection.innerHTML="";
-
-
-  if(
-    save.collection.length===0
-  ){
-
-    collection.innerHTML=
-      "<p>You don't have any squishies yet!</p>";
-
-    return;
-
-  }
-
-
-  save.collection.forEach(
-    id=>{
-
-      const data=TYPES[id];
-
-      const item=
-        document.createElement("div");
-
-      item.className=
-        "collectionItem";
-
-
-      item.innerHTML=`
-        <span>
-          🧸 <b>${data.name}</b>
-        </span>
-
-        <span>
-          ${data.rarity}
-          <br>
-          +${data.income}/sec
-        </span>
-      `;
-
-
-      collection.appendChild(item);
-
-    }
-  );
-
-}
-
-
-document.getElementById(
-  "collectionButton"
-).onclick=()=>{
-
-  renderCollection();
-
-  collectionPanel.classList.remove(
-    "hidden"
-  );
-
-};
-
-
-document.getElementById(
-  "closeCollection"
-).onclick=()=>{
-
-  collectionPanel.classList.add(
-    "hidden"
-  );
-
-};
-
-
-document.getElementById(
-  "interact"
+"interact"
 ).onclick=interact;
 
 
 /* =========================
-   BASE LOCK
+JUMP
 ========================= */
 
-lockBtn.onclick=()=>{
+function jump(){
 
-  if(
-    Date.now()<save.lockUntil
-  ){
+if(grounded){
 
-    message(
-      "🔒 Already locked!"
-    );
+velocityY=7.5;
 
-    return;
+grounded=false;
 
-  }
+}
+
+}
 
 
-  save.lockUntil=
-    Date.now()+15000;
+/* =========================
+NEAREST
+========================= */
+
+function nearest(){
+
+let closest=null;
+
+let distance=3.5;
+
+world.forEach(s=>{
+
+if(
+!s.group.visible ||
+s.stolen
+)return;
+
+const d=
+player.position.distanceTo(
+s.group.position
+);
+
+if(d<distance){
+
+distance=d;
+closest=s;
+
+}
+
+});
+
+return closest;
+
+}
 
 
-  saveGame();
+/* =========================
+STEAL
+========================= */
+
+function interact(){
+
+const s=nearest();
+
+if(s){
+
+const d=
+SQUISHIES[s.type];
 
 
-  message(
-    "🔒 Base locked for 15 seconds!"
-  );
+if(
+s.owner==="npc" &&
+Date.now()<save.lockUntil
+){
+
+showMessage(
+"🔒 Your base is locked!"
+);
+
+return;
+
+}
+
+
+s.stolen=true;
+
+s.group.visible=false;
+
+s.owner="player";
+
+
+if(
+!save.collection.includes(
+s.type
+)
+){
+
+save.collection.push(
+s.type
+);
+
+}
+
+
+const reward=
+Math.floor(d.price*.25);
+
+save.coins+=reward;
+
+save.placed.push({
+type:s.type
+});
+
+addSquishyToBase(
+s.type,
+save.placed.length-1
+);
+
+saveGame();
+
+updateUI();
+
+showMessage(
+"🔥 Stole "+
+d.name+
+" +"+
+reward+
+" coins!"
+);
+
+return;
+
+}
+
+
+/* SHOP */
+
+if(
+Math.abs(player.position.z+8)<5 &&
+player.position.x>-23 &&
+player.position.x<23
+){
+
+openShop();
+
+return;
+
+}
+
+
+/* BASE UPGRADE */
+
+const dx=
+player.position.x+25;
+
+const dz=
+player.position.z-8;
+
+if(
+Math.hypot(dx,dz)<9
+){
+
+const cost=
+save.level*700;
+
+if(save.coins>=cost){
+
+save.coins-=cost;
+
+save.level++;
+
+saveGame();
+
+updateUI();
+
+showMessage(
+"🏠 Base upgraded!"
+);
+
+}else{
+
+showMessage(
+"Need "+cost+" coins"
+);
+
+}
+
+}
+
+}
+
+
+/* =========================
+BASE SQUISHY
+========================= */
+
+const slots=[
+[-29,5],
+[-25,5],
+[-21,5],
+[-29,9],
+[-25,9],
+[-21,9],
+[-29,13],
+[-25,13],
+[-21,13]
+];
+
+
+function addSquishyToBase(
+type,
+index
+){
+
+const slot=
+slots[index%slots.length];
+
+const g=
+createSquishy(type);
+
+g.scale.setScalar(.65);
+
+g.position.set(
+slot[0],
+0,
+slot[1]
+);
+
+scene.add(g);
+
+}
+
+
+/* RESTORE */
+
+save.placed.forEach(
+(item,index)=>{
+
+if(
+SQUISHIES[item.type]
+){
+
+addSquishyToBase(
+item.type,
+index
+);
+
+}
+
+}
+);
+
+
+/* =========================
+SHOP
+========================= */
+
+function openShop(){
+
+document
+.getElementById("shopPanel")
+.classList.remove("hidden");
+
+const shop=
+document.getElementById("shop");
+
+shop.innerHTML="";
+
+Object.entries(
+SQUISHIES
+).forEach(([id,d])=>{
+
+const row=
+document.createElement("div");
+
+row.className="item";
+
+row.innerHTML=`
+
+<div>
+<b>${d.name}</b>
+<br>
+<small>
+${d.rarity}
+• +${d.income}/sec
+</small>
+</div>
+
+<button>
+💰 ${d.price}
+</button>
+
+`;
+
+row.querySelector(
+"button"
+).onclick=()=>{
+
+if(save.coins<d.price){
+
+showMessage(
+"❌ Not enough coins!"
+);
+
+return;
+
+}
+
+save.coins-=d.price;
+
+save.collection.push(id);
+
+save.collection=
+[...new Set(save.collection)];
+
+save.placed.push({
+type:id
+});
+
+addSquishyToBase(
+id,
+save.placed.length-1
+);
+
+saveGame();
+
+updateUI();
+
+showMessage(
+"🛒 Bought "+
+d.name
+);
+
+};
+
+shop.appendChild(row);
+
+});
+
+}
+
+
+function closeShop(){
+
+document
+.getElementById("shopPanel")
+.classList.add("hidden");
+
+}
+
+
+/* =========================
+COLLECTION
+========================= */
+
+function openCollection(){
+
+const panel=
+document.getElementById(
+"collectionPanel"
+);
+
+panel.classList.remove(
+"hidden"
+);
+
+const list=
+document.getElementById(
+"collection"
+);
+
+list.innerHTML="";
+
+if(save.collection.length===0){
+
+list.innerHTML=
+"<p>No squishies yet!</p>";
+
+return;
+
+}
+
+save.collection.forEach(
+id=>{
+
+const d=SQUISHIES[id];
+
+const row=
+document.createElement("div");
+
+row.className="item";
+
+row.innerHTML=`
+
+<b>🧸 ${d.name}</b>
+
+<span>
+${d.rarity}
+<br>
++${d.income}/sec
+</span>
+
+`;
+
+list.appendChild(row);
+
+});
+
+}
+
+
+function closeCollection(){
+
+document
+.getElementById(
+"collectionPanel"
+)
+.classList.add(
+"hidden"
+);
+
+}
+
+
+document.getElementById(
+"collectionButton"
+).onclick=
+openCollection;
+
+
+/* =========================
+LOCK
+========================= */
+
+document.getElementById(
+"lock"
+).onclick=()=>{
+
+if(
+Date.now()<save.lockUntil
+){
+
+showMessage(
+"🔒 Already locked!"
+);
+
+return;
+
+}
+
+save.lockUntil=
+Date.now()+15000;
+
+saveGame();
+
+showMessage(
+"🔒 BASE LOCKED FOR 15 SECONDS!"
+);
 
 };
 
 
-setInterval(
-  ()=>{
+setInterval(()=>{
 
-    if(
-      Date.now()<save.lockUntil
-    ){
-
-      lockTimer.textContent=
-        Math.ceil(
-          (save.lockUntil-Date.now())
-          /1000
-        )+"s";
-
-    }else{
-
-      lockTimer.textContent="";
-
-    }
-
-  },
-  100
+const button=
+document.getElementById(
+"lock"
 );
+
+if(
+Date.now()<save.lockUntil
+){
+
+button.textContent=
+"🔒 "+
+Math.ceil(
+(save.lockUntil-Date.now())/1000
+)+"s";
+
+}else{
+
+button.textContent=
+"🔒 LOCK";
+
+}
+
+},100);
 
 
 /* =========================
-   PASSIVE INCOME
+PASSIVE MONEY
 ========================= */
 
-setInterval(
-  ()=>{
+setInterval(()=>{
 
-    let income=0;
+let income=0;
 
+save.placed.forEach(
+item=>{
 
-    save.placed.forEach(
-      item=>{
+if(
+SQUISHIES[item.type]
+){
 
-        if(TYPES[item.type]){
+income+=
+SQUISHIES[item.type].income;
 
-          income+=
-            TYPES[item.type].income;
+}
 
-        }
+});
 
-      }
-    );
+save.coins+=income;
 
+saveGame();
 
-    save.coins+=income;
+updateUI();
 
-
-    saveGame();
-
-    updateUI();
-
-  },
-  1000
-);
+},1000);
 
 
 /* =========================
-   PLAYER MOVEMENT
+MOVEMENT
 ========================= */
 
 const clock=
-  new THREE.Clock();
+new THREE.Clock();
 
 
-function updatePlayer(delta){
+function updatePlayer(dt){
 
-  let forward=
-    (keys.KeyW?1:0)-
-    (keys.KeyS?1:0)-
-    joystickY;
+let forward=
+(keys.KeyW?1:0)-
+(keys.KeyS?1:0)-
+joyY;
 
-
-  let right=
-    (keys.KeyD?1:0)-
-    (keys.KeyA?1:0)+
-    joystickX;
-
-
-  const length=
-    Math.hypot(
-      forward,
-      right
-    );
+let right=
+(keys.KeyD?1:0)-
+(keys.KeyA?1:0)+
+joyX;
 
 
-  if(length>1){
+const length=
+Math.hypot(
+forward,
+right
+);
 
-    forward/=length;
+if(length>1){
 
-    right/=length;
+forward/=length;
+right/=length;
 
-  }
-
-
-  const speed=7;
-
-
-  const forwardVector=
-    new THREE.Vector3(
-      Math.sin(yaw),
-      0,
-      Math.cos(yaw)
-    );
+}
 
 
-  const rightVector=
-    new THREE.Vector3(
-      Math.cos(yaw),
-      0,
-      -Math.sin(yaw)
-    );
+const speed=7;
 
 
-  player.position.addScaledVector(
-    forwardVector,
-    forward*speed*delta
-  );
+const forwardVector=
+new THREE.Vector3(
+Math.sin(yaw),
+0,
+Math.cos(yaw)
+);
 
 
-  player.position.addScaledVector(
-    rightVector,
-    right*speed*delta
-  );
+const rightVector=
+new THREE.Vector3(
+Math.cos(yaw),
+0,
+-Math.sin(yaw)
+);
 
 
-  /* MAP LIMITS */
-
-  player.position.x=
-    Math.max(
-      -80,
-      Math.min(
-        80,
-        player.position.x
-      )
-    );
+player.position.addScaledVector(
+forwardVector,
+forward*speed*dt
+);
 
 
-  player.position.z=
-    Math.max(
-      -60,
-      Math.min(
-        60,
-        player.position.z
-      )
-    );
+player.position.addScaledVector(
+rightVector,
+right*speed*dt
+);
 
 
-  /* GRAVITY */
+/* LIMIT */
 
-  verticalVelocity-=
-    20*delta;
+player.position.x=
+Math.max(
+-80,
+Math.min(
+80,
+player.position.x
+)
+);
 
-
-  player.position.y+=
-    verticalVelocity*delta;
-
-
-  if(
-    player.position.y<=0
-  ){
-
-    player.position.y=0;
-
-    verticalVelocity=0;
-
-    onGround=true;
-
-  }
+player.position.z=
+Math.max(
+-60,
+Math.min(
+60,
+player.position.z
+)
+);
 
 
-  /* CAMERA */
+/* GRAVITY */
 
-  const target=
-    new THREE.Vector3(
-      player.position.x,
-      player.position.y+1.6,
-      player.position.z
-    );
+velocityY-=20*dt;
+
+player.position.y+=
+velocityY*dt;
 
 
-  const cameraDistance=7;
+if(
+player.position.y<=0
+){
+
+player.position.y=0;
+
+velocityY=0;
+
+grounded=true;
+
+}
 
 
-  const desired=
-    target.clone().add(
-      new THREE.Vector3(
-        -Math.sin(yaw)*cameraDistance,
-        3.3-pitch*2,
-        -Math.cos(yaw)*cameraDistance
-      )
-    );
+/* CAMERA */
 
+const target=
+new THREE.Vector3(
+player.position.x,
+player.position.y+1.6,
+player.position.z
+);
 
-  camera.position.lerp(
-    desired,
-    1-Math.pow(.001,delta)
-  );
+const dist=7;
 
+const desired=
+target.clone().add(
+new THREE.Vector3(
+-Math.sin(yaw)*dist,
+3.4-pitch*2,
+-Math.cos(yaw)*dist
+)
+);
 
-  camera.lookAt(target);
+camera.position.lerp(
+desired,
+1-Math.pow(.001,dt)
+);
+
+camera.lookAt(target);
 
 }
 
 
 /* =========================
-   INTERACTION HINT
+HINT
 ========================= */
 
 function updateHint(){
 
-  const squishy=
-    nearestSquishy();
+const s=nearest();
 
+const hint=
+document.getElementById(
+"hint"
+);
 
-  if(squishy){
+if(s){
 
-    const data=
-      TYPES[squishy.type];
+hint.style.display=
+"block";
 
+hint.textContent=
+"✋ STEAL "+
+SQUISHIES[s.type].name;
 
-    interactHint.style.display=
-      "block";
+}else{
 
+hint.style.display=
+"none";
 
-    interactHint.textContent=
-      "✋ STEAL "+
-      data.name;
-
-  }else{
-
-    interactHint.style.display=
-      "none";
-
-  }
+}
 
 }
 
 
 /* =========================
-   ANIMATION
+MESSAGE
+========================= */
+
+function showMessage(text){
+
+const m=
+document.getElementById(
+"msg"
+);
+
+m.textContent=text;
+
+m.classList.add("show");
+
+clearTimeout(m.timer);
+
+m.timer=
+setTimeout(
+()=>{
+m.classList.remove("show");
+},
+2000
+);
+
+}
+
+
+/* =========================
+ANIMATION
 ========================= */
 
 function animate(){
 
-  requestAnimationFrame(
-    animate
-  );
+requestAnimationFrame(
+animate
+);
+
+const dt=
+Math.min(
+clock.getDelta(),
+.05
+);
+
+updatePlayer(dt);
+
+updateHint();
 
 
-  const delta=
-    Math.min(
-      clock.getDelta(),
-      .05
-    );
+const time=
+performance.now()*.001;
 
 
-  updatePlayer(delta);
+world.forEach(
+(s,i)=>{
 
-  updateHint();
+if(!s.group.visible)
+return;
 
+const wave=
+Math.sin(
+time*4+i
+);
 
-  const time=
-    performance.now()*.001;
+s.group.scale.y=
+1-
+Math.abs(wave)*.08;
 
+s.group.scale.x=
+1+
+Math.abs(wave)*.04;
 
-  worldSquishies.forEach(
-    (squishy,index)=>{
+s.group.scale.z=
+1+
+Math.abs(wave)*.04;
 
-      if(
-        squishy.group.visible
-      ){
+s.group.rotation.y+=
+dt*.25;
 
-        /* Squish animation */
-
-        const wave=
-          Math.sin(
-            time*4+index
-          );
-
-
-        squishy.group.scale.x=
-          .98+
-          Math.abs(wave)*.04;
-
-
-        squishy.group.scale.y=
-          1-
-          Math.abs(wave)*.08;
+});
 
 
-        squishy.group.scale.z=
-          .98+
-          Math.abs(wave)*.04;
-
-
-        squishy.group.rotation.y+=
-          delta*.25;
-
-      }
-
-    }
-  );
-
-
-  renderer.render(
-    scene,
-    camera
-  );
+renderer.render(
+scene,
+camera
+);
 
 }
 
@@ -2360,43 +1987,42 @@ animate();
 
 
 /* =========================
-   RESIZE
+RESIZE
 ========================= */
 
 addEventListener(
-  "resize",
-  ()=>{
+"resize",
+()=>{
 
-    camera.aspect=
-      innerWidth/
-      innerHeight;
+camera.aspect=
+innerWidth/
+innerHeight;
 
-    camera.updateProjectionMatrix();
+camera.updateProjectionMatrix();
 
-    renderer.setSize(
-      innerWidth,
-      innerHeight
-    );
-
-  }
+renderer.setSize(
+innerWidth,
+innerHeight
 );
+
+});
 
 
 /* =========================
-   START
+START
 ========================= */
 
 updateUI();
 
 setTimeout(
-  ()=>{
+()=>{
 
-    message(
-      "🧸 Find a squishy and press E / ✋ to steal it!"
-    );
+showMessage(
+"🧸 Find a squishy and steal it!"
+);
 
-  },
-  800
+},
+700
 );
 
 </script>
