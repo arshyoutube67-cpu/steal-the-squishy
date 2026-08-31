@@ -1,2031 +1,387 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Steal a Squishy 3D</title>
-
 <style>
-*{box-sizing:border-box}
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#87ceeb;font-family:Arial;touch-action:none}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#87ceeb;font-family:Arial,sans-serif;touch-action:none}
 canvas{display:block}
-
-#ui{
-position:fixed;
-top:0;
-left:0;
-width:100%;
-z-index:10;
-pointer-events:none;
-}
-
-#top{
-display:flex;
-gap:8px;
-padding:12px;
-}
-
-.pill{
-background:#151923dd;
-color:white;
-padding:10px 14px;
-border-radius:14px;
-font-weight:bold;
-}
-
-button{
-border:0;
-border-radius:14px;
-font-weight:bold;
-padding:10px 14px;
-}
-
-#lock{
-pointer-events:auto;
-background:#151923;
-color:white;
-}
-
-#msg{
-position:absolute;
-top:65px;
-left:50%;
-transform:translateX(-50%);
-background:#151923ee;
-color:white;
-padding:10px 15px;
-border-radius:12px;
-opacity:0;
-transition:.2s;
-white-space:nowrap;
-}
-
+button{font:inherit;border:0;border-radius:12px;font-weight:800}
+#hud{position:fixed;inset:0;z-index:10;pointer-events:none}
+#top{display:flex;gap:8px;padding:12px;align-items:center}
+.pill,.action{background:#141824eF;color:#fff;padding:9px 13px;border-radius:14px;box-shadow:0 4px 15px #0005}
+.action{pointer-events:auto}
+#msg{position:absolute;top:67px;left:50%;transform:translateX(-50%);background:#141824ee;color:#fff;padding:10px 15px;border-radius:12px;opacity:0;transition:.2s;white-space:nowrap;font-weight:800}
 #msg.show{opacity:1}
-
-#hint{
-position:fixed;
-top:58%;
-left:50%;
-transform:translateX(-50%);
-background:#111d;
-color:white;
-padding:10px 15px;
-border-radius:12px;
-display:none;
-z-index:12;
-font-weight:bold;
-}
-
-#controls{
-position:fixed;
-inset:0;
-z-index:20;
-pointer-events:none;
-}
-
-#joystick{
-position:absolute;
-left:20px;
-bottom:25px;
-width:125px;
-height:125px;
-border-radius:50%;
-background:#ffffff30;
-border:2px solid #ffffff70;
-pointer-events:auto;
-}
-
-#stick{
-position:absolute;
-width:58px;
-height:58px;
-left:31px;
-top:31px;
-border-radius:50%;
-background:#ffffff70;
-}
-
-#buttons{
-position:absolute;
-right:18px;
-bottom:20px;
-display:flex;
-flex-direction:column;
-gap:10px;
-}
-
-#buttons button{
-width:65px;
-height:65px;
-font-size:25px;
-pointer-events:auto;
-background:#ffffffdd;
-}
-
-#help{
-position:fixed;
-bottom:10px;
-left:50%;
-transform:translateX(-50%);
-background:#0008;
-color:white;
-padding:6px 10px;
-border-radius:8px;
-font-size:12px;
-z-index:15;
-}
-
-.panel{
-position:fixed;
-z-index:50;
-left:50%;
-top:50%;
-transform:translate(-50%,-50%);
-width:92%;
-max-width:500px;
-max-height:80%;
-overflow:auto;
-background:#171b29;
-color:white;
-padding:20px;
-border-radius:20px;
-box-shadow:0 20px 60px #0009;
-}
-
+#hint{position:fixed;z-index:12;top:57%;left:50%;transform:translateX(-50%);background:#141824ee;color:#fff;padding:10px 15px;border-radius:12px;display:none;font-weight:800;pointer-events:none}
+.panel{position:fixed;z-index:50;left:50%;top:50%;transform:translate(-50%,-50%);width:92%;max-width:520px;max-height:82%;overflow:auto;background:#171b29;color:#fff;padding:20px;border-radius:20px;box-shadow:0 20px 60px #0009}
 .hidden{display:none}
-
-.item{
-display:flex;
-justify-content:space-between;
-align-items:center;
-background:#ffffff12;
-padding:12px;
-margin:8px 0;
-border-radius:12px;
-}
-
-.close{
-width:100%;
-margin-top:10px;
-}
-
-@media(min-width:800px){
-#joystick,#buttons{display:none}
-}
-
-@media(max-width:799px){
-#help{display:none}
-}
+.item{display:flex;justify-content:space-between;align-items:center;gap:10px;background:#ffffff12;padding:12px;margin:8px 0;border-radius:12px}
+.item button{padding:9px 12px}
+.close{width:100%;padding:12px;margin-top:10px}
+#controls{position:fixed;inset:0;z-index:20;pointer-events:none}
+#joystick{position:absolute;left:20px;bottom:24px;width:125px;height:125px;border-radius:50%;background:#ffffff25;border:2px solid #ffffff70;pointer-events:auto}
+#stick{position:absolute;left:31px;top:31px;width:58px;height:58px;border-radius:50%;background:#ffffff70}
+#buttons{position:absolute;right:18px;bottom:20px;display:flex;flex-direction:column;gap:9px}
+#buttons button{width:64px;height:64px;font-size:24px;background:#ffffffdd;pointer-events:auto}
+#help{position:fixed;z-index:15;bottom:9px;left:50%;transform:translateX(-50%);background:#0008;color:#fff;padding:6px 10px;border-radius:8px;font-size:12px}
+#cross{position:fixed;z-index:11;left:50%;top:50%;transform:translate(-50%,-50%);color:white;font-size:24px;text-shadow:0 2px 4px #000;pointer-events:none}
+@media(min-width:800px){#joystick,#buttons{display:none}}
+@media(max-width:799px){#help{display:none}}
 </style>
 </head>
-
 <body>
-
-<div id="ui">
-<div id="top">
-
-<div class="pill">
-💰 <span id="coins">500</span>
+<div id="hud">
+ <div id="top">
+  <div class="pill">💰 <span id="coins">500</span></div>
+  <div class="pill">🏠 Lv.<span id="level">1</span></div>
+  <button id="lock" class="action">🔒 LOCK</button>
+ </div>
+ <div id="msg"></div>
 </div>
-
-<div class="pill">
-🏠 Lv.<span id="level">1</span>
-</div>
-
-<button id="lock">
-🔒 LOCK
-</button>
-
-</div>
-
-<div id="msg"></div>
-</div>
-
 <div id="hint"></div>
+<div id="cross">+</div>
 
 <div id="controls">
-
-<div id="joystick">
-<div id="stick"></div>
-</div>
-
-<div id="buttons">
-<button id="jump">⬆️</button>
-<button id="interact">✋</button>
-<button id="collectionButton">🧸</button>
-</div>
-
-</div>
-
-<div id="help">
-WASD = Move • Mouse = Look • E = Steal • Space = Jump
+ <div id="joystick"><div id="stick"></div></div>
+ <div id="buttons">
+  <button id="jump">⬆️</button>
+  <button id="interact">✋</button>
+  <button id="collectionButton">🧸</button>
+ </div>
 </div>
 
 <div id="shopPanel" class="panel hidden">
-<h2>🛒 Squishy Shop</h2>
-<div id="shop"></div>
-<button class="close" onclick="closeShop()">Close</button>
+ <h2>🛒 Squishy Shop</h2>
+ <div id="shop"></div>
+ <button class="close" onclick="closeShop()">Close</button>
 </div>
 
 <div id="collectionPanel" class="panel hidden">
-<h2>🧸 My Squishies</h2>
-<div id="collection"></div>
-<button class="close" onclick="closeCollection()">Close</button>
+ <h2>🧸 My Squishies</h2>
+ <div id="collection"></div>
+ <button class="close" onclick="closeCollection()">Close</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-
 <script>
-
-/* =========================
-GAME DATA
-========================= */
-
-const SQUISHIES={
-
-butter:{
-name:"Butter Squishy",
-price:60,
-income:2,
-rarity:"Common",
-color:0xffd84a,
-shape:"butter"
-},
-
-needoh:{
-name:"NeeDoh Squishy",
-price:120,
-income:5,
-rarity:"Rare",
-color:0x69c9ff,
-shape:"ball"
-},
-
-burger:{
-name:"Burger Squishy",
-price:300,
-income:12,
-rarity:"Epic",
-color:0xd58a45,
-shape:"burger"
-},
-
-sprite:{
-name:"Sprite Squishy",
-price:500,
-income:20,
-rarity:"Legendary",
-color:0x65d889,
-shape:"can"
-},
-
-cola:{
-name:"Coca-Cola Squishy",
-price:750,
-income:30,
-rarity:"Legendary",
-color:0xc52f2f,
-shape:"cola"
-},
-
-pepsi:{
-name:"Pepsi Squishy",
-price:1000,
-income:45,
-rarity:"Mythic",
-color:0x3575dc,
-shape:"pepsi"
-}
-
+const TYPES={
+ butter:{name:"Butter Squishy",price:60,income:2,rarity:"Common",color:0xffd84a,shape:"butter"},
+ needoh:{name:"NeeDoh Squishy",price:120,income:5,rarity:"Rare",color:0x69c9ff,shape:"ball"},
+ burger:{name:"Burger Squishy",price:300,income:12,rarity:"Epic",color:0xd58a45,shape:"burger"},
+ sprite:{name:"Sprite Squishy",price:500,income:20,rarity:"Legendary",color:0x64d884,shape:"sprite"},
+ cola:{name:"Coca-Cola Squishy",price:750,income:30,rarity:"Legendary",color:0xc52f2f,shape:"cola"},
+ pepsi:{name:"Pepsi Squishy",price:1000,income:45,rarity:"Mythic",color:0x3575dc,shape:"pepsi"}
 };
-
-
-/* =========================
-SAVE
-========================= */
 
 let save;
-
-try{
-save=JSON.parse(localStorage.getItem("squishySave"));
-}catch(e){
-save=null;
-}
-
-if(!save){
-
-save={
-coins:500,
-level:1,
-collection:[],
-placed:[],
-lockUntil:0
-};
-
-}
-
-if(!save.collection)save.collection=[];
-if(!save.placed)save.placed=[];
-
-function saveGame(){
-
-localStorage.setItem(
-"squishySave",
-JSON.stringify(save)
-);
-
-}
-
-function updateUI(){
-
-document.getElementById("coins").textContent=
-Math.floor(save.coins);
-
-document.getElementById("level").textContent=
-save.level;
-
-}
-
-
-/* =========================
-THREE
-========================= */
+try{save=JSON.parse(localStorage.getItem("stealSquishy3D"))}catch(e){save=null}
+if(!save)save={coins:500,level:1,collection:[],placed:[],lockUntil:0};
+if(!Array.isArray(save.collection))save.collection=[];
+if(!Array.isArray(save.placed))save.placed=[];
+const persist=()=>localStorage.setItem("stealSquishy3D",JSON.stringify(save));
+const coins=document.getElementById("coins"),level=document.getElementById("level");
+function ui(){coins.textContent=Math.floor(save.coins);level.textContent=save.level} ui();
+function say(t){const m=document.getElementById("msg");m.textContent=t;m.classList.add("show");clearTimeout(m.t);m.t=setTimeout(()=>m.classList.remove("show"),1800)}
 
 const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x87ceeb);
+scene.fog=new THREE.Fog(0x87ceeb,45,135);
+const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,300);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;
+document.body.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff,0x526b82,2));
+const sun=new THREE.DirectionalLight(0xffffff,2.4);sun.position.set(20,40,15);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);scene.add(sun);
 
-scene.background=
-new THREE.Color(0x87ceeb);
+function mat(c,extra={}){return new THREE.MeshStandardMaterial({color:c,roughness:.62,...extra})}
+function box(w,h,d,c,x,y,z,extra={}){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(c,extra));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;scene.add(m);return m}
+function cyl(r,h,c,x,y,z,extra={}){const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,32),mat(c,extra));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;scene.add(m);return m}
 
-scene.fog=
-new THREE.Fog(
-0x87ceeb,
-35,
-120
-);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(190,190),mat(0x59b958));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+box(180,.06,11,0x3d424b,0,.02,-8);
+for(let x=-85;x<85;x+=8)box(4,.07,.3,0xf1d05a,x,.08,-8);
 
-const camera=
-new THREE.PerspectiveCamera(
-70,
-innerWidth/innerHeight,
-.1,
-300
-);
+/* Carpet */
+box(5,.08,105,0xb34a6b,0,.07,-60);
+box(4.5,.09,105,0xd76582,0,.12,-60);
+for(let z=-7;z>-110;z-=7)box(4.5,.1,.18,0xf3b0c0,0,.18,z);
 
-const renderer=
-new THREE.WebGLRenderer({
-antialias:true
-});
-
-renderer.setSize(
-innerWidth,
-innerHeight
-);
-
-renderer.setPixelRatio(
-Math.min(devicePixelRatio,2)
-);
-
-renderer.shadowMap.enabled=true;
-
-document.body.appendChild(
-renderer.domElement
-);
-
-
-/* LIGHT */
-
-scene.add(
-new THREE.HemisphereLight(
-0xffffff,
-0x557799,
-2
-)
-);
-
-const sun=
-new THREE.DirectionalLight(
-0xffffff,
-2.5
-);
-
-sun.position.set(
-20,
-40,
-15
-);
-
-sun.castShadow=true;
-
-scene.add(sun);
-
-
-/* =========================
-MATERIAL
-========================= */
-
-function mat(color){
-
-return new THREE.MeshStandardMaterial({
-color:color,
-roughness:.6
-});
-
+/* 3D pillars */
+for(let z=-54;z<=42;z+=12){
+ for(const x of [-5.5,5.5]){
+  cyl(.55,6,0x7d8794,x,3,z);
+  cyl(.75,.35,0xaeb8c3,x,6.15,z);
+  cyl(.75,.35,0xaeb8c3,x,-.05,z);
+ }
 }
 
-
-/* =========================
-GROUND
-========================= */
-
-const ground=
-new THREE.Mesh(
-new THREE.PlaneGeometry(
-180,
-180
-),
-mat(0x58b957)
-);
-
-ground.rotation.x=
--Math.PI/2;
-
-ground.receiveShadow=true;
-
-scene.add(ground);
-
-
-/* =========================
-ROAD
-========================= */
-
-function box(
-w,h,d,c,x,y,z
-){
-
-const m=
-new THREE.Mesh(
-new THREE.BoxGeometry(
-w,h,d
-),
-mat(c)
-);
-
-m.position.set(
-x,y,z
-);
-
-m.castShadow=true;
-m.receiveShadow=true;
-
-scene.add(m);
-
-return m;
-
+/* buildings */
+for(let i=0;i<40;i++){
+ const side=Math.random()>0.5?1:-1,x=side*(40+Math.random()*38),z=-55+Math.random()*110,h=5+Math.random()*14;
+ box(5+Math.random()*4,h,5+Math.random()*4,0x8796a5,x,h/2,z);
 }
 
-box(
-180,
-.05,
-11,
-0x40444d,
-0,
-0,
--8
-);
-
-for(
-let x=-80;
-x<80;
-x+=8
-){
-
-box(
-4,
-.06,
-.25,
-0xf4d35e,
-x,
-.05,
--8
-);
-
+/* Base: actual 3D box, open front gate */
+const BASE={x:-25,z:8};
+box(18,.7,15,0x416be4,BASE.x,.35,BASE.z);
+box(18,6,.7,0x3154bd,BASE.x,3,BASE.z+7.15);
+box(.7,6,15,0x3154bd,BASE.x-8.65,3,BASE.z);
+box(.7,6,15,0x3154bd,BASE.x+8.65,3,BASE.z);
+box(7,6,.7,0x3154bd,BASE.x-5.5,3,BASE.z-7.15);
+box(7,6,.7,0x3154bd,BASE.x+5.5,3,BASE.z-7.15);
+function textSprite(text){
+ const c=document.createElement("canvas");c.width=512;c.height=128;const ctx=c.getContext("2d");ctx.fillStyle="white";ctx.font="bold 54px Arial";ctx.textAlign="center";ctx.fillText(text,256,72);
+ const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true}));s.scale.set(7,1.7,1);return s;
 }
+const sign=textSprite("YOUR BASE");sign.position.set(BASE.x,6.9,BASE.z+6.8);scene.add(sign);
 
-
-/* =========================
-BUILDINGS
-========================= */
-
-for(
-let i=0;
-i<35;
-i++
-){
-
-const side=
-Math.random()>.5?1:-1;
-
-const x=
-side*(40+Math.random()*35);
-
-const z=
--50+Math.random()*100;
-
-const h=
-4+Math.random()*13;
-
-box(
-5,
-h,
-5,
-0x8997a6,
-x,
-h/2,
-z
-);
-
+/* Gate and laser system */
+const gate=new THREE.Group();scene.add(gate);
+for(const x of [-3.5,-1.75,0,1.75,3.5]){
+ const beam=new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,5.5,10),new THREE.MeshBasicMaterial({color:0xff1111}));
+ beam.position.set(BASE.x+x,2.8,BASE.z-7.05);
+ beam.visible=false;gate.add(beam);
 }
+const laserTop=new THREE.Mesh(new THREE.BoxGeometry(9,.07,.07),new THREE.MeshBasicMaterial({color:0xff0000}));
+laserTop.position.set(BASE.x,5.45,BASE.z-7.05);laserTop.visible=false;gate.add(laserTop);
+function setLasers(on){gate.children.forEach(x=>x.visible=on)}
 
-
-/* =========================
-BASES
-========================= */
-
-const bases=[
-[-25,8,0x4c7dff,"YOUR BASE"],
-[25,8,0xff6666,"NPC BASE"],
-[-25,-28,0xa96cff,"NPC BASE"],
-[25,-28,0xff9f43,"NPC BASE"]
-];
-
-function makeText(text){
-
-const canvas=
-document.createElement("canvas");
-
-canvas.width=512;
-canvas.height=128;
-
-const ctx=
-canvas.getContext("2d");
-
-ctx.fillStyle="white";
-
-ctx.font=
-"bold 55px Arial";
-
-ctx.textAlign="center";
-
-ctx.fillText(
-text,
-256,
-75
-);
-
-const texture=
-new THREE.CanvasTexture(
-canvas
-);
-
-const sprite=
-new THREE.Sprite(
-new THREE.SpriteMaterial({
-map:texture,
-transparent:true
-})
-);
-
-sprite.scale.set(
-7,
-1.7,
-1
-);
-
-return sprite;
-
+let locked=false;
+function lockBase(){
+ if(Date.now()<save.lockUntil){say("🔒 Already locked!");return}
+ save.lockUntil=Date.now()+15000;locked=true;setLasers(true);persist();say("🔴 BASE LOCKED!");
 }
-
-bases.forEach(b=>{
-
-box(
-16,
-.6,
-13,
-b[2],
-b[0],
-.3,
-b[1]
-);
-
-const sign=
-makeText(b[3]);
-
-sign.position.set(
-b[0],
-2.7,
-b[1]-6.5
-);
-
-scene.add(sign);
-
-});
-
-
-/* =========================
-SQUISHY CREATOR
-========================= */
-
-function eye(x,y,z){
-
-const e=
-new THREE.Mesh(
-new THREE.SphereGeometry(
-.15,
-16,
-16
-),
-mat(0x111111)
-);
-
-e.position.set(
-x,y,z
-);
-
-return e;
-
-}
-
-
-function createSquishy(type){
-
-const d=
-SQUISHIES[type];
-
-const g=
-new THREE.Group();
-
-let faceZ=-1;
-
-if(d.shape==="butter"){
-
-const body=
-new THREE.Mesh(
-new THREE.BoxGeometry(
-2.2,
-1,
-1.4
-),
-mat(d.color)
-);
-
-body.position.y=.65;
-
-g.add(body);
-
-const top=
-new THREE.Mesh(
-new THREE.BoxGeometry(
-1.7,
-.1,
-1.1
-),
-mat(0xffefa0)
-);
-
-top.position.y=1.18;
-
-g.add(top);
-
-faceZ=-.72;
-
-}
-
-
-else if(d.shape==="burger"){
-
-const top=
-new THREE.Mesh(
-new THREE.SphereGeometry(
-1.25,
-24,
-16,
-0,
-Math.PI*2,
-0,
-Math.PI/2
-),
-mat(0xe9a04c)
-);
-
-top.scale.set(
-1.25,
-.65,
-1
-);
-
-top.position.y=.95;
-
-g.add(top);
-
-
-const patty=
-new THREE.Mesh(
-new THREE.BoxGeometry(
-2.35,
-.42,
-1.7
-),
-mat(0x69351d)
-);
-
-patty.position.y=.55;
-
-g.add(patty);
-
-
-const cheese=
-new THREE.Mesh(
-new THREE.BoxGeometry(
-2.5,
-.16,
-1.8
-),
-mat(0xffd13b)
-);
-
-cheese.position.y=.79;
-
-g.add(cheese);
-
-
-const bottom=
-new THREE.Mesh(
-new THREE.CylinderGeometry(
-1.15,
-1.15,
-.45,
-32
-),
-mat(0xd9813a)
-);
-
-bottom.position.y=.32;
-
-g.add(bottom);
-
-faceZ=-1;
-
-}
-
-
-else if(d.shape==="can"){
-
-const can=
-new THREE.Mesh(
-new THREE.CylinderGeometry(
-.75,
-.75,
-2.1,
-32
-),
-mat(d.color)
-);
-
-can.position.y=1.05;
-
-g.add(can);
-
-
-const top=
-new THREE.Mesh(
-new THREE.CylinderGeometry(
-.68,
-.68,
-.08,
-32
-),
-mat(0xc9cdd0)
-);
-
-top.position.y=2.12;
-
-g.add(top);
-
-
-const stripe=
-new THREE.Mesh(
-new THREE.CylinderGeometry(
-.76,
-.76,
-.15,
-32
-),
-mat(0xffffff)
-);
-
-stripe.position.y=1.15;
-
-g.add(stripe);
-
-faceZ=-.76;
-
-}
-
-
-else{
-
-const ball=
-new THREE.Mesh(
-new THREE.SphereGeometry(
-1.15,
-32,
-24
-),
-mat(d.color)
-);
-
-ball.position.y=1.05;
-
-g.add(ball);
-
-faceZ=-1;
-
-}
-
-
-/* FACE */
-
-g.add(
-eye(-.34,1.3,faceZ),
-eye(.34,1.3,faceZ)
-);
-
-const mouth=
-new THREE.Mesh(
-new THREE.TorusGeometry(
-.18,
-.045,
-8,
-20,
-Math.PI
-),
-mat(0x222222)
-);
-
-mouth.rotation.x=Math.PI;
-
-mouth.position.set(
-0,
-.88,
-faceZ-.03
-);
-
-g.add(mouth);
-
-
-g.traverse(o=>{
-
-if(o.isMesh){
-
-o.castShadow=true;
-o.receiveShadow=true;
-
-}
-
-});
-
-return g;
-
-}
-
-
-/* =========================
-WORLD SQUISHIES
-========================= */
-
-const world=[];
-
-function spawn(
-type,
-x,
-z,
-owner="wild"
-){
-
-const g=
-createSquishy(type);
-
-g.position.set(
-x,
-0,
-z
-);
-
-scene.add(g);
-
-const s={
-group:g,
-type:type,
-owner:owner,
-stolen:false
-};
-
-world.push(s);
-
-return s;
-
-}
-
-
-/* ROAD */
-
-spawn("butter",-10,-8);
-spawn("needoh",-5,-8);
-spawn("burger",1,-8);
-spawn("sprite",7,-8);
-spawn("cola",13,-8);
-spawn("pepsi",19,-8);
-
-
-/* NPC BASES */
-
-spawn("butter",21,8,"npc");
-spawn("needoh",25,8,"npc");
-spawn("burger",29,8,"npc");
-spawn("sprite",21,12,"npc");
-spawn("cola",25,12,"npc");
-spawn("pepsi",29,12,"npc");
-
-spawn("butter",-21,-28,"npc");
-spawn("needoh",-25,-28,"npc");
-spawn("burger",-29,-28,"npc");
-
-spawn("sprite",21,-28,"npc");
-spawn("cola",25,-28,"npc");
-spawn("pepsi",29,-28,"npc");
-
-
-/* =========================
-PLAYER
-========================= */
-
-const player=
-new THREE.Group();
-
-scene.add(player);
-
-const body=
-new THREE.Mesh(
-new THREE.CapsuleGeometry(
-.45,
-1.1,
-6,
-12
-),
-mat(0x276cff)
-);
-
-body.position.y=1.15;
-
-player.add(body);
-
-
-const head=
-new THREE.Mesh(
-new THREE.SphereGeometry(
-.48,
-20,
-16
-),
-mat(0xffc28b)
-);
-
-head.position.y=2.05;
-
-player.add(head);
-
-player.position.set(
--25,
-0,
-14
-);
-
-
-let yaw=0;
-
-let pitch=-.15;
-
-let velocityY=0;
-
-let grounded=true;
-
-const keys={};
-
-
-addEventListener(
-"keydown",
-e=>{
-
-keys[e.code]=true;
-
-if(e.code==="KeyE")
-interact();
-
-if(e.code==="Space")
-jump();
-
-}
-);
-
-
-addEventListener(
-"keyup",
-e=>{
-keys[e.code]=false;
-}
-);
-
-
-/* =========================
-MOUSE
-========================= */
-
-renderer.domElement.addEventListener(
-"click",
-()=>{
-
-if(innerWidth>=800){
-
-renderer.domElement.requestPointerLock();
-
-}
-
-}
-);
-
-
-addEventListener(
-"mousemove",
-e=>{
-
-if(
-document.pointerLockElement===
-renderer.domElement
-){
-
-yaw-=
-e.movementX*.0025;
-
-pitch-=
-e.movementY*.0025;
-
-pitch=
-Math.max(
--1.1,
-Math.min(.6,pitch)
-);
-
-}
-
-}
-);
-
-
-/* =========================
-MOBILE JOYSTICK
-========================= */
-
-const joystick=
-document.getElementById(
-"joystick"
-);
-
-const stick=
-document.getElementById(
-"stick"
-);
-
-let joyX=0;
-let joyY=0;
-let dragging=false;
-
-
-joystick.addEventListener(
-"pointerdown",
-e=>{
-
-dragging=true;
-
-joystick.setPointerCapture(
-e.pointerId
-);
-
-moveJoy(e);
-
-}
-);
-
-
-joystick.addEventListener(
-"pointermove",
-e=>{
-
-if(dragging)
-moveJoy(e);
-
-}
-);
-
-
-joystick.addEventListener(
-"pointerup",
-resetJoy
-);
-
-
-joystick.addEventListener(
-"pointercancel",
-resetJoy
-);
-
-
-function moveJoy(e){
-
-const r=
-joystick.getBoundingClientRect();
-
-let x=
-e.clientX-
-(r.left+r.width/2);
-
-let y=
-e.clientY-
-(r.top+r.height/2);
-
-const max=42;
-
-const d=
-Math.hypot(x,y);
-
-if(d>max){
-
-x=x/d*max;
-y=y/d*max;
-
-}
-
-joyX=x/max;
-joyY=y/max;
-
-stick.style.transform=
-`translate(${x}px,${y}px)`;
-
-}
-
-
-function resetJoy(){
-
-dragging=false;
-
-joyX=0;
-joyY=0;
-
-stick.style.transform=
-"translate(0,0)";
-
-}
-
-
-document.getElementById(
-"jump"
-).onclick=jump;
-
-
-document.getElementById(
-"interact"
-).onclick=interact;
-
-
-/* =========================
-JUMP
-========================= */
-
-function jump(){
-
-if(grounded){
-
-velocityY=7.5;
-
-grounded=false;
-
-}
-
-}
-
-
-/* =========================
-NEAREST
-========================= */
-
-function nearest(){
-
-let closest=null;
-
-let distance=3.5;
-
-world.forEach(s=>{
-
-if(
-!s.group.visible ||
-s.stolen
-)return;
-
-const d=
-player.position.distanceTo(
-s.group.position
-);
-
-if(d<distance){
-
-distance=d;
-closest=s;
-
-}
-
-});
-
-return closest;
-
-}
-
-
-/* =========================
-STEAL
-========================= */
-
-function interact(){
-
-const s=nearest();
-
-if(s){
-
-const d=
-SQUISHIES[s.type];
-
-
-if(
-s.owner==="npc" &&
-Date.now()<save.lockUntil
-){
-
-showMessage(
-"🔒 Your base is locked!"
-);
-
-return;
-
-}
-
-
-s.stolen=true;
-
-s.group.visible=false;
-
-s.owner="player";
-
-
-if(
-!save.collection.includes(
-s.type
-)
-){
-
-save.collection.push(
-s.type
-);
-
-}
-
-
-const reward=
-Math.floor(d.price*.25);
-
-save.coins+=reward;
-
-save.placed.push({
-type:s.type
-});
-
-addSquishyToBase(
-s.type,
-save.placed.length-1
-);
-
-saveGame();
-
-updateUI();
-
-showMessage(
-"🔥 Stole "+
-d.name+
-" +"+
-reward+
-" coins!"
-);
-
-return;
-
-}
-
-
-/* SHOP */
-
-if(
-Math.abs(player.position.z+8)<5 &&
-player.position.x>-23 &&
-player.position.x<23
-){
-
-openShop();
-
-return;
-
-}
-
-
-/* BASE UPGRADE */
-
-const dx=
-player.position.x+25;
-
-const dz=
-player.position.z-8;
-
-if(
-Math.hypot(dx,dz)<9
-){
-
-const cost=
-save.level*700;
-
-if(save.coins>=cost){
-
-save.coins-=cost;
-
-save.level++;
-
-saveGame();
-
-updateUI();
-
-showMessage(
-"🏠 Base upgraded!"
-);
-
-}else{
-
-showMessage(
-"Need "+cost+" coins"
-);
-
-}
-
-}
-
-}
-
-
-/* =========================
-BASE SQUISHY
-========================= */
-
-const slots=[
-[-29,5],
-[-25,5],
-[-21,5],
-[-29,9],
-[-25,9],
-[-21,9],
-[-29,13],
-[-25,13],
-[-21,13]
-];
-
-
-function addSquishyToBase(
-type,
-index
-){
-
-const slot=
-slots[index%slots.length];
-
-const g=
-createSquishy(type);
-
-g.scale.setScalar(.65);
-
-g.position.set(
-slot[0],
-0,
-slot[1]
-);
-
-scene.add(g);
-
-}
-
-
-/* RESTORE */
-
-save.placed.forEach(
-(item,index)=>{
-
-if(
-SQUISHIES[item.type]
-){
-
-addSquishyToBase(
-item.type,
-index
-);
-
-}
-
-}
-);
-
-
-/* =========================
-SHOP
-========================= */
-
-function openShop(){
-
-document
-.getElementById("shopPanel")
-.classList.remove("hidden");
-
-const shop=
-document.getElementById("shop");
-
-shop.innerHTML="";
-
-Object.entries(
-SQUISHIES
-).forEach(([id,d])=>{
-
-const row=
-document.createElement("div");
-
-row.className="item";
-
-row.innerHTML=`
-
-<div>
-<b>${d.name}</b>
-<br>
-<small>
-${d.rarity}
-• +${d.income}/sec
-</small>
-</div>
-
-<button>
-💰 ${d.price}
-</button>
-
-`;
-
-row.querySelector(
-"button"
-).onclick=()=>{
-
-if(save.coins<d.price){
-
-showMessage(
-"❌ Not enough coins!"
-);
-
-return;
-
-}
-
-save.coins-=d.price;
-
-save.collection.push(id);
-
-save.collection=
-[...new Set(save.collection)];
-
-save.placed.push({
-type:id
-});
-
-addSquishyToBase(
-id,
-save.placed.length-1
-);
-
-saveGame();
-
-updateUI();
-
-showMessage(
-"🛒 Bought "+
-d.name
-);
-
-};
-
-shop.appendChild(row);
-
-});
-
-}
-
-
-function closeShop(){
-
-document
-.getElementById("shopPanel")
-.classList.add("hidden");
-
-}
-
-
-/* =========================
-COLLECTION
-========================= */
-
-function openCollection(){
-
-const panel=
-document.getElementById(
-"collectionPanel"
-);
-
-panel.classList.remove(
-"hidden"
-);
-
-const list=
-document.getElementById(
-"collection"
-);
-
-list.innerHTML="";
-
-if(save.collection.length===0){
-
-list.innerHTML=
-"<p>No squishies yet!</p>";
-
-return;
-
-}
-
-save.collection.forEach(
-id=>{
-
-const d=SQUISHIES[id];
-
-const row=
-document.createElement("div");
-
-row.className="item";
-
-row.innerHTML=`
-
-<b>🧸 ${d.name}</b>
-
-<span>
-${d.rarity}
-<br>
-+${d.income}/sec
-</span>
-
-`;
-
-list.appendChild(row);
-
-});
-
-}
-
-
-function closeCollection(){
-
-document
-.getElementById(
-"collectionPanel"
-)
-.classList.add(
-"hidden"
-);
-
-}
-
-
-document.getElementById(
-"collectionButton"
-).onclick=
-openCollection;
-
-
-/* =========================
-LOCK
-========================= */
-
-document.getElementById(
-"lock"
-).onclick=()=>{
-
-if(
-Date.now()<save.lockUntil
-){
-
-showMessage(
-"🔒 Already locked!"
-);
-
-return;
-
-}
-
-save.lockUntil=
-Date.now()+15000;
-
-saveGame();
-
-showMessage(
-"🔒 BASE LOCKED FOR 15 SECONDS!"
-);
-
-};
-
-
+document.getElementById("lock").onclick=lockBase;
 setInterval(()=>{
-
-const button=
-document.getElementById(
-"lock"
-);
-
-if(
-Date.now()<save.lockUntil
-){
-
-button.textContent=
-"🔒 "+
-Math.ceil(
-(save.lockUntil-Date.now())/1000
-)+"s";
-
-}else{
-
-button.textContent=
-"🔒 LOCK";
-
-}
-
+ if(Date.now()<save.lockUntil){setLasers(true);document.getElementById("lock").textContent="🔴 "+Math.ceil((save.lockUntil-Date.now())/1000)+"s"}
+ else{setLasers(false);document.getElementById("lock").textContent="🔒 LOCK";locked=false}
 },100);
 
-
-/* =========================
-PASSIVE MONEY
-========================= */
-
-setInterval(()=>{
-
-let income=0;
-
-save.placed.forEach(
-item=>{
-
-if(
-SQUISHIES[item.type]
-){
-
-income+=
-SQUISHIES[item.type].income;
-
+/* Squishy model */
+function eye(x,y,z){const e=new THREE.Mesh(new THREE.SphereGeometry(.15,16,16),mat(0x111111));e.position.set(x,y,z);return e}
+function createSquishy(type){
+ const d=TYPES[type],g=new THREE.Group();let faceZ=-1;
+ if(d.shape==="butter"){
+  const b=new THREE.Mesh(new THREE.BoxGeometry(2.2,1,1.4),mat(d.color));b.position.y=.65;g.add(b);
+  const t=new THREE.Mesh(new THREE.BoxGeometry(1.7,.1,1.1),mat(0xffef9a));t.position.y=1.18;g.add(t);faceZ=-.72;
+ }else if(d.shape==="burger"){
+  const top=new THREE.Mesh(new THREE.SphereGeometry(1.25,24,16,0,Math.PI*2,0,Math.PI/2),mat(0xe9a04c));top.scale.set(1.25,.65,1);top.position.y=.95;g.add(top);
+  const patty=new THREE.Mesh(new THREE.BoxGeometry(2.35,.42,1.7),mat(0x69351d));patty.position.y=.55;g.add(patty);
+  const cheese=new THREE.Mesh(new THREE.BoxGeometry(2.5,.16,1.8),mat(0xffd13b));cheese.position.y=.79;g.add(cheese);
+  const bottom=new THREE.Mesh(new THREE.CylinderGeometry(1.15,1.15,.45,32),mat(0xd9813a));bottom.position.y=.32;g.add(bottom);
+ }else if(d.shape==="sprite"||d.shape==="cola"||d.shape==="pepsi"){
+  const can=new THREE.Mesh(new THREE.CylinderGeometry(.75,.75,2.1,32),mat(d.color));can.position.y=1.05;g.add(can);
+  const top=new THREE.Mesh(new THREE.CylinderGeometry(.68,.68,.08,32),mat(0xc9cdd0));top.position.y=2.12;g.add(top);
+  const band=new THREE.Mesh(new THREE.CylinderGeometry(.765,.765,.15,32),mat(0xffffff));band.position.y=1.15;g.add(band);
+  faceZ=-.77;
+ }else{
+  const b=new THREE.Mesh(new THREE.SphereGeometry(1.15,32,24),mat(d.color));b.position.y=1.05;g.add(b);
+ }
+ g.add(eye(-.34,1.3,faceZ),eye(.34,1.3,faceZ));
+ const mouth=new THREE.Mesh(new THREE.TorusGeometry(.18,.045,8,20,Math.PI),mat(0x222222));mouth.rotation.x=Math.PI;mouth.position.set(0,.88,faceZ-.03);g.add(mouth);
+ g.traverse(o=>{if(o.isMesh)o.castShadow=o.receiveShadow=true});
+ return g;
 }
 
+/* 10 permanent slots */
+const slotPositions=[
+[-31,4],[-28,4],[-25,4],[-22,4],[-19,4],
+[-31,8],[-28,8],[-25,8],[-22,8],[-19,8]
+];
+const slotPads=[];
+slotPositions.forEach((p,i)=>{
+ const pad=new THREE.Mesh(new THREE.CylinderGeometry(1.15,1.15,.12,24),mat(0x284aa8));
+ pad.position.set(p[0],.72,p[1]);pad.receiveShadow=true;scene.add(pad);slotPads.push(pad);
+ const label=textSprite(String(i+1));label.scale.set(.7,.7,1);label.position.set(p[0],.9,p[1]+1.2);scene.add(label);
 });
+function placeAtSlot(type,index){
+ if(index>=10)return;
+ const g=createSquishy(type);g.scale.setScalar(.58);const p=slotPositions[index];g.position.set(p[0],.72,p[1]);scene.add(g);
+}
 
-save.coins+=income;
+/* restore only first 10 */
+save.placed.slice(0,10).forEach((x,i)=>{if(TYPES[x.type])placeAtSlot(x.type,i)});
 
-saveGame();
+/* Moving squishies coming down carpet */
+const moving=[];
+let spawnClock=0;
+function spawnCarpetSquishy(){
+ const keys=Object.keys(TYPES);
+ const weights=["butter","butter","needoh","needoh","burger","sprite","cola","pepsi"];
+ const type=weights[Math.floor(Math.random()*weights.length)];
+ const g=createSquishy(type);g.scale.setScalar(.62);g.position.set(0,.15,-58);scene.add(g);
+ moving.push({group:g,type,speed:2.5+Math.random()*1.6,stolen:false});
+}
+for(let i=0;i<5;i++)spawnCarpetSquishy();
 
-updateUI();
+/* Player normal body */
+const player=new THREE.Group();scene.add(player);
+const torso=new THREE.Mesh(new THREE.BoxGeometry(.85,1.25,.5),mat(0x256cff));torso.position.y=1.3;player.add(torso);
+const neck=new THREE.Mesh(new THREE.CylinderGeometry(.16,.16,.2,16),mat(0xffc28b));neck.position.y=1.98;player.add(neck);
+const head=new THREE.Mesh(new THREE.SphereGeometry(.45,20,16),mat(0xffc28b));head.position.y=2.38;player.add(head);
+const armL=new THREE.Mesh(new THREE.CapsuleGeometry(.13,.75,5,10),mat(0x256cff));armL.position.set(-.58,1.38,0);armL.rotation.z=-.12;player.add(armL);
+const armR=new THREE.Mesh(new THREE.CapsuleGeometry(.13,.75,5,10),mat(0x256cff));armR.position.set(.58,1.38,0);armR.rotation.z=.12;player.add(armR);
+const legL=new THREE.Mesh(new THREE.CapsuleGeometry(.15,.72,5,10),mat(0x222b45));legL.position.set(-.23,.43,0);player.add(legL);
+const legR=new THREE.Mesh(new THREE.CapsuleGeometry(.15,.72,5,10),mat(0x222b45));legR.position.set(.23,.43,0);player.add(legR);
+player.traverse(o=>{if(o.isMesh)o.castShadow=true});
+player.position.set(-25,0,14);
 
+/* Controls */
+let yaw=0,pitch=-.12,vy=0,onGround=true;
+const keys={};
+addEventListener("keydown",e=>{keys[e.code]=true;if(e.code==="KeyE")interact();if(e.code==="Space")jump()});
+addEventListener("keyup",e=>keys[e.code]=false);
+renderer.domElement.addEventListener("click",()=>{if(innerWidth>=800)renderer.domElement.requestPointerLock()});
+addEventListener("mousemove",e=>{if(document.pointerLockElement===renderer.domElement){yaw-=e.movementX*.0025;pitch-=e.movementY*.0025;pitch=Math.max(-1.05,Math.min(.55,pitch))}});
+
+/* phone: joystick + right-side swipe camera */
+const joystick=document.getElementById("joystick"),stick=document.getElementById("stick");
+let joyX=0,joyY=0,joyDrag=false;
+joystick.addEventListener("pointerdown",e=>{joyDrag=true;joystick.setPointerCapture(e.pointerId);joy(e)});
+joystick.addEventListener("pointermove",e=>{if(joyDrag)joy(e)});
+joystick.addEventListener("pointerup",resetJoy);joystick.addEventListener("pointercancel",resetJoy);
+function joy(e){
+ const r=joystick.getBoundingClientRect();let x=e.clientX-(r.left+r.width/2),y=e.clientY-(r.top+r.height/2),max=42,d=Math.hypot(x,y);
+ if(d>max){x=x/d*max;y=y/d*max}
+ joyX=x/max;joyY=y/max;stick.style.transform=`translate(${x}px,${y}px)`;
+}
+function resetJoy(){joyDrag=false;joyX=joyY=0;stick.style.transform="translate(0,0)"}
+let lookId=null,lastLX=0,lastLY=0;
+addEventListener("pointerdown",e=>{if(innerWidth<800&&e.clientX>innerWidth*.45){lookId=e.pointerId;lastLX=e.clientX;lastLY=e.clientY}});
+addEventListener("pointermove",e=>{if(e.pointerId===lookId){yaw-=(e.clientX-lastLX)*.006;pitch-=(e.clientY-lastLY)*.005;pitch=Math.max(-1.05,Math.min(.55,pitch));lastLX=e.clientX;lastLY=e.clientY}});
+addEventListener("pointerup",e=>{if(e.pointerId===lookId)lookId=null});
+document.getElementById("jump").onclick=jump;
+document.getElementById("interact").onclick=interact;
+document.getElementById("collectionButton").onclick=openCollection;
+
+function jump(){if(onGround){vy=7.5;onGround=false}}
+
+/* interact: moving carpet squishies, then upgrade */
+function nearestMoving(){
+ let best=null,bd=3.4;
+ moving.forEach(s=>{if(s.stolen||!s.group.visible)return;const d=player.position.distanceTo(s.group.position);if(d<bd){bd=d;best=s}});
+ return best;
+}
+function interact(){
+ const s=nearestMoving();
+ if(s){
+  const d=TYPES[s.type];
+  s.stolen=true;s.group.visible=false;
+  if(!save.collection.includes(s.type))save.collection.push(s.type);
+  const reward=Math.floor(d.price*.25);save.coins+=reward;
+  if(save.placed.length<10){save.placed.push({type:s.type});placeAtSlot(s.type,save.placed.length-1)}
+  saveGame();ui();say("🔥 Stole "+d.name+"! +"+reward);
+  return;
+ }
+ const nearBase=Math.hypot(player.position.x-BASE.x,player.position.z-BASE.z)<9;
+ if(nearBase){
+  const cost=save.level*700;
+  if(save.coins>=cost){save.coins-=cost;save.level++;saveGame();ui();say("🏠 Base upgraded!")}
+  else say("Need "+cost+" coins");
+  return;
+ }
+ if(Math.abs(player.position.z+8)<6&&Math.abs(player.position.x)<25){openShop();return}
+}
+
+/* Shop */
+function openShop(){
+ document.getElementById("shopPanel").classList.remove("hidden");
+ const el=document.getElementById("shop");el.innerHTML="";
+ Object.entries(TYPES).forEach(([id,d])=>{
+  const row=document.createElement("div");row.className="item";
+  row.innerHTML=`<div><b>${d.name}</b><br><small>${d.rarity} • +${d.income}/sec</small></div><button>💰 ${d.price}</button>`;
+  row.querySelector("button").onclick=()=>{
+   if(save.placed.length>=10){say("🔟 Your base is full!");return}
+   if(save.coins<d.price){say("❌ Not enough coins!");return}
+   save.coins-=d.price;save.collection.push(id);save.collection=[...new Set(save.collection)];save.placed.push({type:id});placeAtSlot(d.id,save.placed.length-1);
+  };
+  /* fix shop placement call */
+  row.querySelector("button").onclick=()=>{
+   if(save.placed.length>=10){say("🔟 Your base has 10/10 squishies!");return}
+   if(save.coins<d.price){say("❌ Not enough coins!");return}
+   save.coins-=d.price;
+   if(!save.collection.includes(id))save.collection.push(id);
+   save.placed.push({type:id});
+   placeAtSlot(id,save.placed.length-1);
+   saveGame();ui();say("🛒 Bought "+d.name);
+  };
+  el.appendChild(row);
+ });
+}
+function closeShop(){document.getElementById("shopPanel").classList.add("hidden")}
+
+/* Collection */
+function openCollection(){
+ document.getElementById("collectionPanel").classList.remove("hidden");
+ const el=document.getElementById("collection");el.innerHTML="";
+ if(!save.collection.length){el.innerHTML="<p>No squishies yet!</p>";return}
+ save.collection.forEach(id=>{const d=TYPES[id];const row=document.createElement("div");row.className="item";row.innerHTML=`<b>🧸 ${d.name}</b><span>${d.rarity}<br>+${d.income}/sec</span>`;el.appendChild(row)});
+}
+function closeCollection(){document.getElementById("collectionPanel").classList.add("hidden")}
+
+/* Income */
+setInterval(()=>{
+ let income=0;
+ save.placed.slice(0,10).forEach(x=>{if(TYPES[x.type])income+=TYPES[x.type].income});
+ save.coins+=income;persist();ui();
 },1000);
 
-
-/* =========================
-MOVEMENT
-========================= */
-
-const clock=
-new THREE.Clock();
-
-
+/* movement + camera */
+const clock=new THREE.Clock();
 function updatePlayer(dt){
-
-let forward=
-(keys.KeyW?1:0)-
-(keys.KeyS?1:0)-
-joyY;
-
-let right=
-(keys.KeyD?1:0)-
-(keys.KeyA?1:0)+
-joyX;
-
-
-const length=
-Math.hypot(
-forward,
-right
-);
-
-if(length>1){
-
-forward/=length;
-right/=length;
-
+ let f=(keys.KeyW?1:0)-(keys.KeyS?1:0)-joyY;
+ let r=(keys.KeyD?1:0)-(keys.KeyA?1:0)+joyX;
+ const len=Math.hypot(f,r);if(len>1){f/=len;r/=len}
+ const speed=7;
+ const fv=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
+ const rv=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));
+ player.position.addScaledVector(fv,f*speed*dt);
+ player.position.addScaledVector(rv,r*speed*dt);
+ player.position.x=Math.max(-80,Math.min(80,player.position.x));
+ player.position.z=Math.max(-65,Math.min(65,player.position.z));
+ vy-=20*dt;player.position.y+=vy*dt;
+ if(player.position.y<=0){player.position.y=0;vy=0;onGround=true}
+ const target=new THREE.Vector3(player.position.x,player.position.y+1.6,player.position.z);
+ const desired=target.clone().add(new THREE.Vector3(-Math.sin(yaw)*7,3.5-pitch*2,-Math.cos(yaw)*7));
+ camera.position.lerp(desired,1-Math.pow(.001,dt));camera.lookAt(target);
 }
 
-
-const speed=7;
-
-
-const forwardVector=
-new THREE.Vector3(
-Math.sin(yaw),
-0,
-Math.cos(yaw)
-);
-
-
-const rightVector=
-new THREE.Vector3(
-Math.cos(yaw),
-0,
--Math.sin(yaw)
-);
-
-
-player.position.addScaledVector(
-forwardVector,
-forward*speed*dt
-);
-
-
-player.position.addScaledVector(
-rightVector,
-right*speed*dt
-);
-
-
-/* LIMIT */
-
-player.position.x=
-Math.max(
--80,
-Math.min(
-80,
-player.position.x
-)
-);
-
-player.position.z=
-Math.max(
--60,
-Math.min(
-60,
-player.position.z
-)
-);
-
-
-/* GRAVITY */
-
-velocityY-=20*dt;
-
-player.position.y+=
-velocityY*dt;
-
-
-if(
-player.position.y<=0
-){
-
-player.position.y=0;
-
-velocityY=0;
-
-grounded=true;
-
+/* Moving carpet stream */
+function updateCarpet(dt){
+ spawnClock+=dt;
+ if(spawnClock>3.2){spawnClock=0;if(moving.length<12)spawnCarpetSquishy()}
+ for(let i=moving.length-1;i>=0;i--){
+  const s=moving[i];
+  if(s.stolen){moving.splice(i,1);continue}
+  s.group.position.z+=s.speed*dt;
+  if(s.group.position.z>42){s.group.visible=false;moving.splice(i,1);continue}
+  const w=Math.sin(performance.now()*.004+i);s.group.scale.y=.62*(1-Math.abs(w)*.08);s.group.scale.x=.62*(1+Math.abs(w)*.04);s.group.scale.z=s.group.scale.x;s.group.rotation.y+=dt*.3;
+ }
 }
 
-
-/* CAMERA */
-
-const target=
-new THREE.Vector3(
-player.position.x,
-player.position.y+1.6,
-player.position.z
-);
-
-const dist=7;
-
-const desired=
-target.clone().add(
-new THREE.Vector3(
--Math.sin(yaw)*dist,
-3.4-pitch*2,
--Math.cos(yaw)*dist
-)
-);
-
-camera.position.lerp(
-desired,
-1-Math.pow(.001,dt)
-);
-
-camera.lookAt(target);
-
+/* hint */
+function hint(){
+ const s=nearestMoving(),h=document.getElementById("hint");
+ if(s){h.style.display="block";h.textContent="✋ STEAL "+TYPES[s.type].name}else h.style.display="none";
 }
 
-
-/* =========================
-HINT
-========================= */
-
-function updateHint(){
-
-const s=nearest();
-
-const hint=
-document.getElementById(
-"hint"
-);
-
-if(s){
-
-hint.style.display=
-"block";
-
-hint.textContent=
-"✋ STEAL "+
-SQUISHIES[s.type].name;
-
-}else{
-
-hint.style.display=
-"none";
-
-}
-
-}
-
-
-/* =========================
-MESSAGE
-========================= */
-
-function showMessage(text){
-
-const m=
-document.getElementById(
-"msg"
-);
-
-m.textContent=text;
-
-m.classList.add("show");
-
-clearTimeout(m.timer);
-
-m.timer=
-setTimeout(
-()=>{
-m.classList.remove("show");
-},
-2000
-);
-
-}
-
-
-/* =========================
-ANIMATION
-========================= */
-
+/* loop */
 function animate(){
-
-requestAnimationFrame(
-animate
-);
-
-const dt=
-Math.min(
-clock.getDelta(),
-.05
-);
-
-updatePlayer(dt);
-
-updateHint();
-
-
-const time=
-performance.now()*.001;
-
-
-world.forEach(
-(s,i)=>{
-
-if(!s.group.visible)
-return;
-
-const wave=
-Math.sin(
-time*4+i
-);
-
-s.group.scale.y=
-1-
-Math.abs(wave)*.08;
-
-s.group.scale.x=
-1+
-Math.abs(wave)*.04;
-
-s.group.scale.z=
-1+
-Math.abs(wave)*.04;
-
-s.group.rotation.y+=
-dt*.25;
-
-});
-
-
-renderer.render(
-scene,
-camera
-);
-
+ requestAnimationFrame(animate);
+ const dt=Math.min(clock.getDelta(),.05);
+ updatePlayer(dt);updateCarpet(dt);hint();
+ renderer.render(scene,camera);
 }
-
-
 animate();
 
-
-/* =========================
-RESIZE
-========================= */
-
-addEventListener(
-"resize",
-()=>{
-
-camera.aspect=
-innerWidth/
-innerHeight;
-
-camera.updateProjectionMatrix();
-
-renderer.setSize(
-innerWidth,
-innerHeight
-);
-
+addEventListener("resize",()=>{
+ camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);
 });
 
-
-/* =========================
-START
-========================= */
-
-updateUI();
-
-setTimeout(
-()=>{
-
-showMessage(
-"🧸 Find a squishy and steal it!"
-);
-
-},
-700
-);
-
+setTimeout(()=>say("🧸 Squishies are coming down the carpet!"),700);
 </script>
-
 </body>
 </html>
